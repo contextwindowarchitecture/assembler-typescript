@@ -1,5 +1,5 @@
 {
-  "website_commit": "a2dea4fb428db93a93ba11f83649b3004bf557e4",
+  "website_commit": "387a3e96248e0d5d496e4fa82497cdef755b4b39",
   "dirty": false,
   "files": {
     "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
@@ -16,6 +16,10 @@
     "conformance/cases/budget-margin-protected/case.json": "d3fca9f4e8642640e7a44144a359d8d3f287e64048ce44e8af736b4f44cf5f3d",
     "conformance/cases/budget-margin-protected/expected.trace.json": "f9b8c193ed5364ebe0ee23ffb74604c19f0d857eed10bc01c1a195e47abf68ae",
     "conformance/cases/budget-margin-protected/snapshot.json": "c6f67bdee5eb49d9e5b68c49558ce9cf3c5bc7407ce1200f8e614450e2840585",
+    "conformance/cases/budget-margin-rounding/case.json": "9a8ca33d804b69fb04533e0f3df161994183d6b1db58360b2a55bd694996df5f",
+    "conformance/cases/budget-margin-rounding/expected.payload.txt": "2f1b837a9b2a7930418df9f27191cb3471f0f9ee5a8da5795b900d09b44c65d6",
+    "conformance/cases/budget-margin-rounding/expected.trace.json": "9bddec5f839dc9988c49efe99b53c80bfde0f3f397b67c108bc84bc99cd31b91",
+    "conformance/cases/budget-margin-rounding/snapshot.json": "71683ace65da6b3abea65e1d79345a702b26692aa2c72cc01565c18dbf283588",
     "conformance/cases/budget-margin/case.json": "7aebee4fc20c4da7e4870bcf919e57d7e505359e0c0615f2d8640dbb0ab7dd3d",
     "conformance/cases/budget-margin/expected.payload.txt": "38b03700c8c1ef70b42cc7348a05c4c7d121aa0b98b031de6bf291489999d871",
     "conformance/cases/budget-margin/expected.trace.json": "0ab27591f510ac326a84910fdac3eba30282afa932edb57886776ab233d3c956",
@@ -146,6 +150,10 @@
     "conformance/cases/protected-over-slot-cap/case.json": "2c71d404b5249c5bdf60d6921a269d77422941027e74c663a71a9691c29a19bf",
     "conformance/cases/protected-over-slot-cap/expected.trace.json": "bd7a8ad4f4a1e95246ee3f2de0e2147ac0d826ec2e16230a2795f9167ae101a7",
     "conformance/cases/protected-over-slot-cap/snapshot.json": "c0f55acdbdcada0f916a5fce152948bd60e1d0a59acd70f353bf740cad71d204",
+    "conformance/cases/render-attribute-escaping/case.json": "490b1071303f3421ebe4e3f304a1b4defc0c8660c5772d41b920667a9dc199e3",
+    "conformance/cases/render-attribute-escaping/expected.payload.txt": "d0aafe4b3a5f65551d15c1e160f8ad819e6a556c002fd22538680b75974bfc6c",
+    "conformance/cases/render-attribute-escaping/expected.trace.json": "e65f1b78304c359c1cf369d664379db31d790c6edc4b3d998278838556ee9722",
+    "conformance/cases/render-attribute-escaping/snapshot.json": "2fc88e0ff88e7bdae495d4bcb1f6865199234272d6763e8baa5a6251a61f7536",
     "conformance/cases/required-slot-missing/case.json": "15318bdcbda3d9ee24e82b4f547755d1f377382524734d69ecfa4070112b159b",
     "conformance/cases/required-slot-missing/expected.trace.json": "d458d486f432e4eac40c28cf41c5f7dcfbe13020b14e292f61685bf86360ba47",
     "conformance/cases/required-slot-missing/snapshot.json": "76bbf795cc574bd9fe760eabc5d9c04834a4b0358f64c6bc022f95117fb11f4a",
