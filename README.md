@@ -4,6 +4,12 @@ A TypeScript assembler for the [Context Window Architecture](https://contextwind
 
 Status: in development (M13). It passes all 46 published conformance cases byte for byte and rejects all 14 rejection snapshots.
 
+## Install
+
+```sh
+npm install @contextwindowarchitecture/assembler
+```
+
 ## Use
 
 ```ts
@@ -46,6 +52,10 @@ This runs every vendored case and rejection snapshot as `conformance/README.md` 
 ## The contract
 
 `vendor/cwa/` holds the published contract this implementation follows: the schemas, the contract data and the conformance cases, copied from the website repository. `vendor/cwa.lock.json` pins each file by SHA-256 and records the website commit. It is Apache-2.0 licensed; see `vendor/cwa/LICENSE` and `vendor/cwa/NOTICE`.
+
+## Publishing
+
+`npm publish` publishes with public access (`publishConfig`). `prepublishOnly` runs the tests and a fresh build first, so a failing or stale `dist/` is never published. The tarball holds `dist/`, `LICENSE`, `NOTICE`, `README.md` and `package.json`.
 
 See [AGENTS.md](AGENTS.md) for the working rules.
 

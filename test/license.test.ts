@@ -20,3 +20,12 @@ test('the packed package carries LICENSE and NOTICE', () => {
   const paths = pack!.files.map(file => file.path);
   for (const path of ['LICENSE', 'NOTICE']) assert.ok(paths.includes(path), path);
 });
+
+test('the package publishes publicly under its scope, and only after a build that passes the tests', () => {
+  const pkg = JSON.parse(read('package.json')) as { name: string; private?: boolean; publishConfig?: { access?: string }; scripts: Record<string, string> };
+  assert.match(pkg.name, /^@contextwindowarchitecture\//);
+  assert.notEqual(pkg.private, true);
+  assert.equal(pkg.publishConfig?.access, 'public');
+  assert.match(pkg.scripts['prepublishOnly'] ?? '', /npm test/);
+  assert.match(pkg.scripts['prepublishOnly'] ?? '', /npm run build/);
+});
