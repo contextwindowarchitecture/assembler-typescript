@@ -2,7 +2,7 @@
 // Every reduction is decided per item, and every fit test renders and counts the whole payload.
 import { SLOTS } from './contract.js';
 import { byRank, shedSlots } from './rank.js';
-import { render, renderedBody, type Rendered } from './renderers.js';
+import { countPayload, render, renderedBody, type Rendered } from './renderers.js';
 import type { AdmittedItem } from './admission.js';
 import type { Tokenizer } from './tokenizers.js';
 import type { ExcludedRow, Slot, Snapshot, Variant } from './types.js';
@@ -39,11 +39,14 @@ export function fit(snapshot: Snapshot, items: AdmittedItem[], marks: Map<string
   const slotSize = (state: State, slot: Slot): number => [...state.values()]
     .filter(c => c.admitted.item.slot === slot)
     .reduce((sum, c) => sum + wraps(slot).reduce((n, wrap) => n + count(renderedBody(wrap, c.body)), 0), 0);
-  const renderState = (state: State): Rendered => render(snapshot.renderer, placement, [...state.values()].map(c => ({
+  const renderItems = (state: State) => [...state.values()].map(c => ({
     id: c.admitted.item.id, slot: c.admitted.item.slot, body: c.body, lineage: c.admitted.item.lineage, conflict: marks.get(c.admitted.item.id),
-  })), count);
-  // The charged count, n × (100 + margin) / 100 rounded up, must be at most budget.input.
-  const fits = (state: State): boolean => Math.floor((renderState(state).tokens * (100 + margin) + 99) / 100) <= snapshot.budget.input;
+  }));
+  const renderState = (state: State): Rendered => render(snapshot.renderer, placement, renderItems(state), count);
+  // The charged count, n × (100 + margin) / 100 rounded up, must be at most budget.input. Each fit test counts
+  // the whole payload, since a tokenizer need not count a whole as the sum of its parts.
+  const fits = (state: State): boolean =>
+    Math.floor((countPayload(snapshot.renderer, placement, renderItems(state), count) * (100 + margin) + 99) / 100) <= snapshot.budget.input;
 
   const state: State = new Map(items.map(admitted => [admitted.item.id, { admitted, body: admitted.item.body }]));
   const rows: ExcludedRow[] = [];
@@ -89,6 +92,10 @@ export function fit(snapshot: Snapshot, items: AdmittedItem[], marks: Map<string
   // `floor` withholds a reduction that would leave the slot below min_tokens, and then the step stops.
   const runStep = (step: Step, satisfied: (s: State) => boolean, floor?: (slot: Slot, after: State) => boolean): void => {
     for (const a of shedding(step.slot).filter(x => x.tier === 'compressible')) {
+      // An item with no shorter variant is left as it is, so it needs no fit test.
+      const current = state.get(a.item.id)!;
+      const shorter = step.action === 'compress' ? a.item.variants.filter(v => size(step.slot, v.body) < size(step.slot, current.body)) : [];
+      if (step.action === 'compress' && shorter.length === 0) continue;
       if (satisfied(state)) return;
       let after: State;
       let variant: Variant | undefined;
@@ -96,9 +103,6 @@ export function fit(snapshot: Snapshot, items: AdmittedItem[], marks: Map<string
         after = new Map(state);
         after.delete(a.item.id);
       } else {
-        const current = state.get(a.item.id)!;
-        const shorter = a.item.variants.filter(v => size(step.slot, v.body) < size(step.slot, current.body));
-        if (shorter.length === 0) continue;
         variant = pick(step.slot, shorter.filter(v => satisfied(withBody(a, v.body, v))), true) ?? pick(step.slot, shorter, false)!;
         after = withBody(a, variant.body, variant);
       }

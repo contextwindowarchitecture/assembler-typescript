@@ -31,6 +31,10 @@ npm run build
 npm test
 ```
 
+## Cost
+
+Every reduction under budget pressure is its own fit test, and every fit test renders and counts the whole payload (conformance/README.md, Fitting). A fit test counts only the payload; per-item counts are made once, for the trace. Shedding 498 of 500 passages of about 180 tokens each takes about a third of a second, nearly all of it tokenizing. Keep the cost down at the source, as the spec advises: send no more passages than the route's budget can use, and bound slots with `max_per_source` or `max_tokens`.
+
 ## Conformance
 
 ```sh

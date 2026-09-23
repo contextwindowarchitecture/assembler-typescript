@@ -68,49 +68,55 @@ function xmlElement(tag: string, item: RenderItem, speaker: boolean): string {
   return `<${tag}${attributes}>\n${escape(item.body)}\n</${tag}>\n`;
 }
 
-/** Each placement's items, ordered by id within the placement. */
-function placed(placement: Placement, items: readonly RenderItem[]): { index: number; wrap: string; items: RenderItem[] }[] {
-  return placement.map(({ slot, wrap }, index) => ({
-    index, wrap, items: items.filter(item => item.slot === slot).sort((a, b) => compareStrings(a.id, b.id)),
-  }));
+/** A payload's parts before counting: the texts the renderer counts, and each item occurrence in order. */
+interface Layout {
+  /** The payload text: fixture-xml/v1's document, or cwa-messages/v1's RFC 8785 request. */
+  text: string;
+  /** The texts the renderer's count sums: the document, or every system and tools text and the message content. */
+  counted: string[];
+  occurrences: { item: RenderItem; placement: number; wrap: string }[];
 }
 
-export function render(renderer: string, placement: Placement, items: readonly RenderItem[], count: Tokenizer): Rendered {
-  const occurrences: Occurrence[] = [];
-  const occur = (item: RenderItem, index: number, wrap: string): void => {
-    occurrences.push({ item, placement: index, tokens: count(renderedBody(wrap, item.body)) });
-  };
+function layout(renderer: string, placement: Placement, items: readonly RenderItem[]): Layout {
+  const sorted = [...items].sort((a, b) => compareStrings(a.id, b.id));
+  const occurrences: Layout['occurrences'] = [];
+  placement.forEach(({ slot, wrap }, index) => {
+    for (const item of sorted) if (item.slot === slot) occurrences.push({ item, placement: index, wrap });
+  });
   if (renderer === 'fixture-xml/v1') {
-    let text = '';
-    for (const { index, wrap, items: here } of placed(placement, items)) {
-      for (const item of here) {
-        text += xmlElement(wrap.slice(4), item, false);
-        occur(item, index, wrap);
-      }
-    }
-    return { payload: Buffer.from(text, 'utf8'), tokens: count(text), occurrences };
+    const text = occurrences.map(({ item, wrap }) => xmlElement(wrap.slice(4), item, false)).join('');
+    return { text, counted: [text], occurrences };
   }
   if (renderer === 'cwa-messages/v1') {
-    const system: object[] = [];
-    const tools: object[] = [];
+    const system: { id: string; text: string; conflict?: string }[] = [];
+    const tools: typeof system = [];
     let content = '';
-    let tokens = 0;
-    for (const { index, wrap, items: here } of placed(placement, items)) {
-      for (const item of here) {
-        if (wrap === 'system' || wrap === 'tools') {
-          (wrap === 'system' ? system : tools).push({ id: item.id, text: item.body, ...(item.conflict !== undefined ? { conflict: item.conflict } : {}) });
-          tokens += count(item.body);
-        } else {
-          content += xmlElement(wrap.slice(4), item, true);
-        }
-        occur(item, index, wrap);
+    for (const { item, wrap } of occurrences) {
+      if (wrap === 'system' || wrap === 'tools') {
+        (wrap === 'system' ? system : tools).push({ id: item.id, text: item.body, ...(item.conflict !== undefined ? { conflict: item.conflict } : {}) });
+      } else {
+        content += xmlElement(wrap.slice(4), item, true);
       }
     }
-    tokens += count(content);
-    const payload = canonicalize({ system, tools, messages: [{ role: 'user', content }] });
-    return { payload: Buffer.from(payload, 'utf8'), tokens, occurrences };
+    const text = canonicalize({ system, tools, messages: [{ role: 'user', content }] });
+    return { text, counted: [...system.map(e => e.text), ...tools.map(e => e.text), content], occurrences };
   }
   throw new Error(`renderer ${renderer} is not provided`);
+}
+
+const total = (texts: string[], count: Tokenizer): number => texts.reduce((sum, text) => sum + count(text), 0);
+
+/** The renderer's count of the payload the items render to, without building the rest of the result. */
+export const countPayload = (renderer: string, placement: Placement, items: readonly RenderItem[], count: Tokenizer): number =>
+  total(layout(renderer, placement, items).counted, count);
+
+export function render(renderer: string, placement: Placement, items: readonly RenderItem[], count: Tokenizer): Rendered {
+  const { text, counted, occurrences } = layout(renderer, placement, items);
+  return {
+    payload: Buffer.from(text, 'utf8'),
+    tokens: total(counted, count),
+    occurrences: occurrences.map(({ item, placement: index, wrap }) => ({ item, placement: index, tokens: count(renderedBody(wrap, item.body)) })),
+  };
 }
 
 export const sha256 = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
