@@ -1,4 +1,4 @@
-# @cwa/assembler
+# @contextwindowarchitecture/assembler
 
 A TypeScript assembler for the [Context Window Architecture](https://contextwindowarchitecture.io) (CWA) draft specification. It admits candidate items, resolves declared conflicts, fits them to a token budget, renders the payload and emits the trace.
 
@@ -7,7 +7,7 @@ Status: in development (M13). It passes all 46 published conformance cases byte 
 ## Use
 
 ```ts
-import { assemble, SnapshotRejectedError } from '@cwa/assembler';
+import { assemble, SnapshotRejectedError } from '@contextwindowarchitecture/assembler';
 
 const { payload, trace } = assemble(snapshot);
 // payload: the rendered UTF-8 bytes, or null when the assembly is refused (trace.refused.reason says why)

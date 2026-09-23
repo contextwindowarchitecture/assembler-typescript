@@ -1,4 +1,4 @@
-// @cwa/assembler: a TypeScript assembler for the CWA draft specification.
+// @contextwindowarchitecture/assembler: a TypeScript assembler for the CWA draft specification.
 export { assemble, type AssembleOptions, type Assembly } from './assemble.js';
 export { checkSnapshot } from './snapshot-checks.js';
 export { snapshotDigest } from './digest.js';
