@@ -2,7 +2,22 @@
 
 A TypeScript assembler for the [Context Window Architecture](https://contextwindowarchitecture.io) (CWA) draft specification. It admits candidate items, resolves declared conflicts, fits them to a token budget, renders the payload and emits the trace.
 
-Status: in development (M13). Its target is every published conformance case.
+Status: in development (M13). It passes all 44 published conformance cases byte for byte and rejects all 14 rejection snapshots.
+
+## Use
+
+```ts
+import { assemble, SnapshotRejectedError } from '@cwa/assembler';
+
+const { payload, trace } = assemble(snapshot);
+// payload: the rendered UTF-8 bytes, or null when the assembly is refused (trace.refused.reason says why)
+```
+
+`assemble(snapshot, options?)` takes a snapshot in the shape of `schema/snapshot.schema.json`: the frozen assembly input (R-23). It runs admission, conflict resolution, supersession, deduplication, the source diversity cap, the refusal checks and fitting, as `conformance/README.md` defines them. It returns the payload and a trace valid against `schema/trace.schema.json`.
+
+- A snapshot that fails its schemas or the snapshot checks throws `SnapshotRejectedError`, with its `problems` in words. There is no payload and no trace (R-17). `checkSnapshot(snapshot)` returns the same problems without assembling.
+- A snapshot that names a tokenizer or renderer this package does not provide throws `UnsupportedComponentError`. The package provides the tokenizers `fixture-whitespace/v1` and `estimate-utf8/v1` and the renderers `fixture-xml/v1` and `cwa-messages/v1`. Pass your model's tokenizer as `options.tokenizers`, keyed by the ID your snapshots name.
+- `options.traceId` sets the trace id, which is otherwise a random UUID. `trace.timings` records each stage's duration in milliseconds. Both may differ between runs of the same snapshot (R-23); everything else, the payload bytes included, is deterministic.
 
 ## Requirements
 
