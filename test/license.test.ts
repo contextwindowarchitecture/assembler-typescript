@@ -29,3 +29,18 @@ test('the package publishes publicly under its scope, and only after a build tha
   assert.match(pkg.scripts['prepublishOnly'] ?? '', /npm test/);
   assert.match(pkg.scripts['prepublishOnly'] ?? '', /npm run build/);
 });
+
+test('the package names its GitHub repository, the one its origin remote points at', () => {
+  const pkg = JSON.parse(read('package.json')) as { repository?: { type: string; url: string } };
+  assert.deepEqual(pkg.repository, { type: 'git', url: 'git+https://github.com/contextwindowarchitecture/assembler-typescript.git' });
+  let origin: string | undefined;
+  try {
+    origin = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    origin = undefined; // a checkout without an origin remote has nothing to compare
+  }
+  if (origin !== undefined) {
+    const repo = (url: string) => url.replace(/^git\+/, '').replace(/^git@github\.com:/, 'https://github.com/').replace(/\.git$/, '');
+    assert.equal(repo(pkg.repository!.url), repo(origin));
+  }
+});
