@@ -16,4 +16,8 @@ npm run build
 npm test
 ```
 
+## The contract
+
+`vendor/cwa/` holds the published contract this implementation follows: the schemas, the contract data and the conformance cases, copied from the website repository. `vendor/cwa.lock.json` pins each file by SHA-256 and records the website commit. It is Apache-2.0 licensed; see `vendor/cwa/LICENSE` and `vendor/cwa/NOTICE`.
+
 See [AGENTS.md](AGENTS.md) for the working rules.

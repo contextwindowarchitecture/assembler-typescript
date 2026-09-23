@@ -15,6 +15,7 @@ A TypeScript implementation of the CWA draft specification (M13 of the CWA plan)
 
 - Work from the published spec only: the contract vendored in `vendor/cwa/`. Don't read the reference assembler (`../cwa-assembler`).
 - Where the spec leaves a behavior open, don't decide it here. Ask the maintainer, fix the spec in the website repo first (with its tests, committed on its `assembler-v0.0.1` branch), re-vendor, then implement.
+- `vendor/cwa.lock.json` pins every vendored file by SHA-256, like a lockfile, with the website commit it came from and whether that checkout was dirty. Change vendored files only with `npm run vendor -- <website checkout>`. The tests fail when a vendored file no longer matches its hash, or when a file is added or missing.
 
 ## Commands
 
@@ -22,4 +23,5 @@ A TypeScript implementation of the CWA draft specification (M13 of the CWA plan)
 npm ci
 npm run build          # tsc: dist/ with .js and .d.ts
 npm test               # build, then run the tests
+npm run vendor -- ../website   # re-vendor the contract from a website checkout
 ```
