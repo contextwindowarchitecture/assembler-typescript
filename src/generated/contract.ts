@@ -2,7 +2,7 @@
 
 /** The website commit the vendored contract came from (vendor/cwa.lock.json). */
 export const CONTRACT_SOURCE = {
-  "website_commit": "7be2f49484be2f4ea1d9cfe93ecb23c404431bfc",
+  "website_commit": "a2dea4fb428db93a93ba11f83649b3004bf557e4",
   "dirty": false
 } as const;
 
@@ -477,6 +477,9 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
     "allOf": [
       {
         "if": {
+          "required": [
+            "slot"
+          ],
           "properties": {
             "slot": {
               "const": "interaction.memory"
@@ -499,6 +502,9 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
       },
       {
         "if": {
+          "required": [
+            "slot"
+          ],
           "properties": {
             "slot": {
               "const": "evidence.knowledge"

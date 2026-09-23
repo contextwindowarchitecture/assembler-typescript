@@ -468,6 +468,25 @@
           }
         },
         {
+          "id": "kb:no-slot",
+          "source": "src:kb:no-slot",
+          "source_version": "1",
+          "authority": "reference_only",
+          "trust": "unverified",
+          "freshness": "2026-09-12T15:30:00Z",
+          "body": "An item without a slot.",
+          "token_budget": null,
+          "variants": [],
+          "conflict_policy": "defers",
+          "lineage": "verbatim",
+          "eligibility": "route-policy",
+          "injection_risk": "untrusted_content",
+          "relevance": 0.91,
+          "scope": {
+            "tenant": "acme"
+          }
+        },
+        {
           "id": "﻿",
           "slot": "evidence.knowledge",
           "source": "src:﻿",

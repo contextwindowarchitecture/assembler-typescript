@@ -250,6 +250,11 @@
       "slot": "evidence.knowledge"
     },
     {
+      "item_id": "kb:no-slot",
+      "reason": "missing_field:slot",
+      "stage": "assembler"
+    },
+    {
       "item_id": "kb:old",
       "reason": "not_eligible",
       "stage": "assembler",
@@ -381,7 +386,7 @@
     "route_policy_version": "admission/v1",
     "tokenizer": "fixture-whitespace/v1",
     "renderer": "fixture-xml/v1",
-    "snapshot_digest": "a8631abbfa8cb38962f98ddd52dba65d20fa37a87d149d65b920724b1a84a8d6"
+    "snapshot_digest": "f7b45c1bc48fbd824367a35f23726d8861870890a07fc57a556c89c8c2b10d0f"
   },
   "defaults_filled": [
     {
