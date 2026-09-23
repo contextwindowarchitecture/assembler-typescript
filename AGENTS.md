@@ -18,6 +18,9 @@ A TypeScript implementation of the CWA draft specification (M13 of the CWA plan)
 - `vendor/cwa.lock.json` pins every vendored file by SHA-256, like a lockfile, with the website commit it came from and whether that checkout was dirty. Change vendored files only with `npm run vendor -- <website checkout>`. The tests fail when a vendored file no longer matches its hash, or when a file is added or missing.
 - `src/generated/` is generated from the vendored contract by `npm run generate`: `types.ts` holds the TypeScript types json-schema-to-typescript derives from the published schemas, and `contract.ts` embeds the schemas, reasons and slot defaults. Don't edit either by hand; the tests fail when they are stale. Run `npm run generate` after every re-vendor.
 
+- `conformance-report.json` is committed and must be the current run. Rerun `npm run conformance` after any change to the assembler or the vendored contract, and commit the report with the change.
+- `src/implementation.ts` names the package in reports. Change it with `package.json`'s name or version; a test holds them together.
+
 ## Commands
 
 ```sh
@@ -26,4 +29,5 @@ npm run build          # tsc: dist/ with .js and .d.ts
 npm test               # build, then run the tests
 npm run vendor -- ../website   # re-vendor the contract from a website checkout
 npm run generate       # regenerate src/generated/ from vendor/cwa/
+npm run conformance    # run every case and write conformance-report.json
 ```

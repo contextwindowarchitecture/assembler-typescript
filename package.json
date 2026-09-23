@@ -21,7 +21,8 @@
     "build:test": "tsc -p tsconfig.test.json",
     "test": "npm run build:test && node --test \"build/test/**/*.test.js\"",
     "vendor": "node scripts/vendor-contract.mjs",
-    "generate": "node scripts/generate.mjs"
+    "generate": "node scripts/generate.mjs",
+    "conformance": "npm run build && node dist/cli/conformance.js vendor/cwa/conformance conformance-report.json"
   },
   "devDependencies": {
     "@types/node": "22.20.4",
