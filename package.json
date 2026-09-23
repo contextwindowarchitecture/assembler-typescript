@@ -2,6 +2,7 @@
   "name": "@cwa/assembler",
   "version": "0.0.1",
   "description": "A TypeScript assembler for the Context Window Architecture (CWA) draft specification",
+  "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -14,7 +15,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

@@ -48,3 +48,7 @@ This runs every vendored case and rejection snapshot as `conformance/README.md` 
 `vendor/cwa/` holds the published contract this implementation follows: the schemas, the contract data and the conformance cases, copied from the website repository. `vendor/cwa.lock.json` pins each file by SHA-256 and records the website commit. It is Apache-2.0 licensed; see `vendor/cwa/LICENSE` and `vendor/cwa/NOTICE`.
 
 See [AGENTS.md](AGENTS.md) for the working rules.
+
+## License
+
+Apache License 2.0, the same as the specification: see [LICENSE](LICENSE) and [NOTICE](NOTICE). The package embeds the published schemas and contract data, and `vendor/cwa/` holds the conformance cases, all from the Apache-2.0 specification.
