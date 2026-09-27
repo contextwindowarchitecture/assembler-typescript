@@ -1,7 +1,7 @@
 // Snapshot checks (conformance/README.md): a snapshot that fails its schemas or any of these checks is rejected
 // before assembly, with no payload and no trace (R-17). No reason code names these problems, so they are words.
 import { describeErrors, validateSnapshot } from './schemas.js';
-import { isWellFormed } from './strings.js';
+import { hasFiniteNumbers, isWellFormed } from './strings.js';
 import { realizationProblems } from './renderers.js';
 import type { Snapshot } from './types.js';
 
@@ -12,7 +12,9 @@ export function checkSnapshot(value: unknown): string[] {
   if (!validateSnapshot(value)) return describeErrors(validateSnapshot.errors);
   const snapshot = value as Snapshot;
   const problems: string[] = [];
+  // I-JSON (R-17): RFC 8785 can serialize neither an unpaired surrogate nor a number a double cannot hold.
   if (!isWellFormed(snapshot)) problems.push('a string holds an unpaired surrogate, so the snapshot is not well-formed Unicode');
+  if (!hasFiniteNumbers(snapshot)) problems.push('a number is outside the IEEE 754 double range, so the snapshot is not I-JSON');
 
   const producers = snapshot.batches.map(batch => batch.producer.id);
   for (const id of new Set(producers.filter((id, i) => producers.indexOf(id) !== i))) {
@@ -41,12 +43,14 @@ export function checkSnapshot(value: unknown): string[] {
     }
   }
 
-  // Producer exclusions (R-13): duplicate_of names a candidate in the same batch.
+  // Producer exclusions (R-9, R-13): duplicate_of and superseded_by name a candidate in the same batch.
   for (const batch of snapshot.batches) {
     const candidates = new Set(batch.items.map(item => (item as { id?: unknown }).id));
     for (const row of batch.excluded) {
-      if (row.duplicate_of !== undefined && !candidates.has(row.duplicate_of)) {
-        problems.push(`${batch.producer.id}'s exclusion of ${row.item_id} names ${row.duplicate_of} as kept, which is not a candidate in its batch`);
+      for (const kept of [row.duplicate_of, row.superseded_by]) {
+        if (kept !== undefined && !candidates.has(kept)) {
+          problems.push(`${batch.producer.id}'s exclusion of ${row.item_id} names ${kept} as kept, which is not a candidate in its batch`);
+        }
       }
     }
   }

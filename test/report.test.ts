@@ -17,9 +17,9 @@ test('the report passes every case and rejects every rejection snapshot, in the 
   assert.equal(validateReport(report), true, JSON.stringify(validateReport.errors));
   assert.deepEqual(report.implementation, { name: pkg.name, version: pkg.version, language: 'TypeScript' });
   assert.deepEqual(report.contract, { website_commit: lock.website_commit, dirty: lock.dirty });
-  assert.equal(report.cases.length, 46);
+  assert.equal(report.cases.length, 50);
   assert.deepEqual(report.cases.filter(c => c.outcome !== 'passed'), []);
-  assert.equal(report.rejections?.length, 14);
+  assert.equal(report.rejections?.length, 22);
   assert.deepEqual(report.rejections?.filter(r => r.outcome !== 'rejected'), []);
   const ids = report.cases.map(c => c.id);
   assert.deepEqual(ids, [...ids].sort());

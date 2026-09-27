@@ -40,6 +40,6 @@ test('the vendored contract holds the schemas, contract data and every conforman
     'schema/conformance_report.schema.json', 'LICENSE', 'NOTICE']) {
     assert.ok(paths.includes(path), path);
   }
-  assert.equal(paths.filter(path => /^conformance\/cases\/[^/]+\/case\.json$/.test(path)).length, 46);
-  assert.equal(paths.filter(path => /^conformance\/rejections\/[^/]+\/case\.json$/.test(path)).length, 14);
+  assert.equal(paths.filter(path => /^conformance\/cases\/[^/]+\/case\.json$/.test(path)).length, 50);
+  assert.equal(paths.filter(path => /^conformance\/rejections\/[^/]+\/case\.json$/.test(path)).length, 22);
 });

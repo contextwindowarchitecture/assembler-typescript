@@ -46,7 +46,7 @@ export type CWAContextItem = {
   expires?: string;
   scope?: Scope;
   /**
-   * Human-readable admission rule description. Never evaluate this string as code; the route owns the executable predicate.
+   * Human-readable admission rule description. Never evaluate this string as code; the route owns the executable predicate. It is never blank, since the trace repeats it for every included occurrence (R-22).
    */
   eligibility?: string;
   /**
@@ -73,12 +73,50 @@ export type Variants = {
 }[];
 export type Excluded = {
   item_id: string;
-  reason: string;
+  /**
+   * An exclusion code from contract/reasons.json (R-9, R-21): one of these, or missing_field:<name> with a non-blank name.
+   */
+  reason:
+    | (
+        | "producer_not_authenticated"
+        | "unknown_slot"
+        | "unknown_authority"
+        | "invalid_structure"
+        | "duplicate_item_id"
+        | "producer_slot_not_allowed"
+        | "authority_not_allowed"
+        | "capability_not_allowed"
+        | "untrusted_in_governance"
+        | "untrusted_content_unmarked"
+        | "protected_tier_changed"
+        | "tier_upgrade_not_allowed"
+        | "duplicate_variant_id"
+        | "revoked"
+        | "expired"
+        | "future_freshness"
+        | "stale_state"
+        | "source_invalid"
+        | "out_of_scope"
+        | "below_threshold"
+        | "not_eligible"
+        | "slot_unplaced"
+        | "conflict_deferred"
+        | "conflict_lost"
+        | "superseded"
+        | "duplicate_content"
+        | "source_diversity_cap"
+        | "over_budget"
+      )
+    | string;
   stage: "producer";
   /**
    * For duplicate_content only: the id of the candidate in this batch the producer kept in the dropped item's place (R-13).
    */
   duplicate_of?: string;
+  /**
+   * For superseded only: the id of the candidate in this batch the producer kept in the superseded item's place (R-9).
+   */
+  superseded_by?: string;
 }[];
 export type CWAPlacementProfile = {
   /**
@@ -149,8 +187,8 @@ export type CWAAssemblyTrace = {
       | "interaction.query";
     item_id: string;
     tokens: number;
-    source_version?: string;
-    eligibility?: string;
+    source_version: string;
+    eligibility: string;
   }[];
   compressed: {
     slot:
@@ -207,7 +245,7 @@ export type CWAAssemblyTrace = {
      */
     resolution: "resolved" | "surfaced" | "context_requested" | "refused" | "moot";
     decided_by: "authority" | "policy" | "freshness" | "escalated" | "moot";
-    group_id?: string;
+    group_id: string;
     /**
      * The member that prevailed, when one did. One of items.
      */
@@ -226,9 +264,15 @@ export type CWAAssemblyTrace = {
     route_policy_version: string;
     tokenizer: string;
     renderer: string;
-    snapshot_digest?: string;
+    /**
+     * Lowercase SHA-256 of the normalized snapshot, as conformance/README.md's Snapshot digest defines it (R-22).
+     */
+    snapshot_digest: string;
   };
-  defaults_filled?: {
+  /**
+   * One record per item and policy field filled under R-3; an empty list when none were (R-22).
+   */
+  defaults_filled: {
     item_id: string;
     field: "token_budget" | "variants" | "conflict_policy" | "lineage" | "eligibility" | "injection_risk";
   }[];
@@ -352,7 +396,7 @@ export interface CWARoutePolicy {
    */
   on_unresolved_instruction?: "surface" | "request_context" | "refuse";
   /**
-   * Producers this route admits, keyed by the identity the application authenticated. Batches from any other producer are refused.
+   * Producers this route admits, keyed by the identity the application authenticated. Items from any other producer, or from a producer listed with another kind, are excluded with producer_not_authenticated (R-15).
    */
   producers: {
     [k: string]:
@@ -375,7 +419,7 @@ export interface CWARoutePolicy {
             | "interaction.query"
           )[];
           /**
-           * For kind mcp only: the route has verified this server, so its output need not be marked untrusted_content (R-15). Default false.
+           * For kind mcp only: the route has verified this server, so its output need not be marked untrusted_content (R-15). It does nothing else: it never ranks the server's claims in a fact group (R-11). Default false.
            */
           verified?: boolean;
         }
@@ -403,7 +447,7 @@ export interface CWARoutePolicy {
           conflict_policy?: "defers" | "governs" | "escalate";
           lineage?: "verbatim" | "summarised" | "redacted" | "translated" | "extracted" | "generated";
           /**
-           * Human-readable admission rule description. Never evaluate this string as code; the route owns the executable predicate.
+           * Human-readable admission rule description. Never evaluate this string as code; the route owns the executable predicate. It is never blank, since the trace repeats it for every included occurrence (R-22).
            */
           eligibility?: string;
           injection_risk?: "none" | "untrusted_content";
@@ -417,7 +461,7 @@ export interface CWARoutePolicy {
     [k: string]: "compressible" | "protected" | undefined;
   };
   /**
-   * The order in which compressible items are reduced once every droppable item is gone (R-16). Each step compresses (selects supplied variants for) or omits one slot's compressible items, lowest-ranked first, until the payload fits. Steps the route does not list follow in the default order: compress each slot, then omit each slot, both in shedding order. With no steps, variants always come before omission.
+   * The order in which compressible items are reduced under budget pressure, once every droppable item is gone (R-16). Item token_budget caps and slot max_tokens caps apply before it, whether or not the payload fits. Each step compresses (selects supplied variants for) or omits one slot's compressible items, lowest-ranked first, until the payload fits. Steps the route does not list follow in the default order: compress each slot, then omit each slot, both in shedding order. With no steps, variants always come before omission.
    */
   fitting_order?: {
     slot:
@@ -441,7 +485,7 @@ export interface CWARoutePolicy {
     [k: string]:
       | {
           /**
-           * Producers whose claims about this fact are eligible, by the identity the application authenticated, most authoritative first. A member from any other producer is ineligible: it cannot win and is excluded when another member does. item.source never counts (R-15).
+           * Producers whose claims about this fact are eligible, by the identity the application authenticated, most authoritative first. A member from any other producer is ineligible: it cannot win and is excluded when another member does. item.source never counts (R-15), and neither do a member's trust and injection_risk or the producer's verified flag (R-11): a route that prefers a verified server lists it earlier.
            *
            * @minItems 1
            */
@@ -494,7 +538,7 @@ export interface SlotRules {
    */
   min_included?: number;
   /**
-   * Cap on the slot's share of the payload: the tokens of its included items' rendered bodies, every occurrence counted (R-16). It holds whether or not the payload fits. After token_budget caps and before budget pressure, the slot sheds its own items in tier order until it is within the cap; protected items alone over it refuse the assembly with protected_content_over_budget. Absent, the slot has no cap and budget.input still bounds it.
+   * Cap on the slot's share of the payload: the tokens of its included items' rendered bodies, every occurrence counted (R-16). It holds whether or not the payload fits. Protected items alone over it refuse the assembly with protected_content_over_budget before anything is reduced. Otherwise, after token_budget caps and before budget pressure, the slot sheds its own items in tier order until it is within the cap. Absent, the slot has no cap and budget.input still bounds it.
    */
   max_tokens?: number;
   /**
@@ -546,7 +590,7 @@ export interface SlotRules1 {
    */
   min_included?: number;
   /**
-   * Cap on the slot's share of the payload: the tokens of its included items' rendered bodies, every occurrence counted (R-16). It holds whether or not the payload fits. After token_budget caps and before budget pressure, the slot sheds its own items in tier order until it is within the cap; protected items alone over it refuse the assembly with protected_content_over_budget. Absent, the slot has no cap and budget.input still bounds it.
+   * Cap on the slot's share of the payload: the tokens of its included items' rendered bodies, every occurrence counted (R-16). It holds whether or not the payload fits. Protected items alone over it refuse the assembly with protected_content_over_budget before anything is reduced. Otherwise, after token_budget caps and before budget pressure, the slot sheds its own items in tier order until it is within the cap. Absent, the slot has no cap and budget.input still bounds it.
    */
   max_tokens?: number;
   /**

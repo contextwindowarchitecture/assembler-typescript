@@ -2,7 +2,7 @@
 
 /** The website commit the vendored contract came from (vendor/cwa.lock.json). */
 export const CONTRACT_SOURCE = {
-  "website_commit": "387a3e96248e0d5d496e4fa82497cdef755b4b39",
+  "website_commit": "2e5d48b5a6ab7fc1035ce8c63f27aac22c5b73fc",
   "dirty": false
 } as const;
 
@@ -374,7 +374,9 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
       },
       "eligibility": {
         "type": "string",
-        "description": "Human-readable admission rule description. Never evaluate this string as code; the route owns the executable predicate."
+        "minLength": 1,
+        "pattern": "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]",
+        "description": "Human-readable admission rule description. Never evaluate this string as code; the route owns the executable predicate. It is never blank, since the trace repeats it for every included occurrence (R-22)."
       },
       "token_budget": {
         "type": [
@@ -545,9 +547,45 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
               "pattern": "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
             },
             "reason": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+              "description": "An exclusion code from contract/reasons.json (R-9, R-21): one of these, or missing_field:<name> with a non-blank name.",
+              "anyOf": [
+                {
+                  "enum": [
+                    "producer_not_authenticated",
+                    "unknown_slot",
+                    "unknown_authority",
+                    "invalid_structure",
+                    "duplicate_item_id",
+                    "producer_slot_not_allowed",
+                    "authority_not_allowed",
+                    "capability_not_allowed",
+                    "untrusted_in_governance",
+                    "untrusted_content_unmarked",
+                    "protected_tier_changed",
+                    "tier_upgrade_not_allowed",
+                    "duplicate_variant_id",
+                    "revoked",
+                    "expired",
+                    "future_freshness",
+                    "stale_state",
+                    "source_invalid",
+                    "out_of_scope",
+                    "below_threshold",
+                    "not_eligible",
+                    "slot_unplaced",
+                    "conflict_deferred",
+                    "conflict_lost",
+                    "superseded",
+                    "duplicate_content",
+                    "source_diversity_cap",
+                    "over_budget"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "pattern": "^missing_field:[\\s\\S]*[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+                }
+              ]
             },
             "stage": {
               "const": "producer"
@@ -557,6 +595,12 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
               "minLength": 1,
               "pattern": "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]",
               "description": "For duplicate_content only: the id of the candidate in this batch the producer kept in the dropped item's place (R-13)."
+            },
+            "superseded_by": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]",
+              "description": "For superseded only: the id of the candidate in this batch the producer kept in the superseded item's place (R-9)."
             }
           },
           "required": [
@@ -565,34 +609,68 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
             "stage"
           ],
           "additionalProperties": false,
-          "if": {
-            "properties": {
-              "reason": {
-                "const": "duplicate_content"
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "reason": {
+                    "const": "duplicate_content"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              },
+              "then": {
+                "required": [
+                  "duplicate_of"
+                ],
+                "properties": {
+                  "duplicate_of": true
+                }
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "duplicate_of"
+                  ],
+                  "properties": {
+                    "duplicate_of": true
+                  }
+                }
               }
             },
-            "required": [
-              "reason"
-            ]
-          },
-          "then": {
-            "required": [
-              "duplicate_of"
-            ],
-            "properties": {
-              "duplicate_of": true
-            }
-          },
-          "else": {
-            "not": {
-              "required": [
-                "duplicate_of"
-              ],
-              "properties": {
-                "duplicate_of": true
+            {
+              "if": {
+                "properties": {
+                  "reason": {
+                    "const": "superseded"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              },
+              "then": {
+                "required": [
+                  "superseded_by"
+                ],
+                "properties": {
+                  "superseded_by": true
+                }
+              },
+              "else": {
+                "not": {
+                  "required": [
+                    "superseded_by"
+                  ],
+                  "properties": {
+                    "superseded_by": true
+                  }
+                }
               }
             }
-          }
+          ]
         }
       }
     },
@@ -924,7 +1002,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
       },
       "producers": {
         "type": "object",
-        "description": "Producers this route admits, keyed by the identity the application authenticated. Batches from any other producer are refused.",
+        "description": "Producers this route admits, keyed by the identity the application authenticated. Items from any other producer, or from a producer listed with another kind, are excluded with producer_not_authenticated (R-15).",
         "additionalProperties": {
           "type": "object",
           "additionalProperties": false,
@@ -955,7 +1033,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
             },
             "verified": {
               "type": "boolean",
-              "description": "For kind mcp only: the route has verified this server, so its output need not be marked untrusted_content (R-15). Default false."
+              "description": "For kind mcp only: the route has verified this server, so its output need not be marked untrusted_content (R-15). It does nothing else: it never ranks the server's claims in a fact group (R-11). Default false."
             }
           }
         }
@@ -1036,7 +1114,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
       "fitting_order": {
         "type": "array",
         "uniqueItems": true,
-        "description": "The order in which compressible items are reduced once every droppable item is gone (R-16). Each step compresses (selects supplied variants for) or omits one slot's compressible items, lowest-ranked first, until the payload fits. Steps the route does not list follow in the default order: compress each slot, then omit each slot, both in shedding order. With no steps, variants always come before omission.",
+        "description": "The order in which compressible items are reduced under budget pressure, once every droppable item is gone (R-16). Item token_budget caps and slot max_tokens caps apply before it, whether or not the payload fits. Each step compresses (selects supplied variants for) or omits one slot's compressible items, lowest-ranked first, until the payload fits. Steps the route does not list follow in the default order: compress each slot, then omit each slot, both in shedding order. With no steps, variants always come before omission.",
         "items": {
           "type": "object",
           "additionalProperties": false,
@@ -1082,7 +1160,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
                 "minLength": 1,
                 "pattern": "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
               },
-              "description": "Producers whose claims about this fact are eligible, by the identity the application authenticated, most authoritative first. A member from any other producer is ineligible: it cannot win and is excluded when another member does. item.source never counts (R-15)."
+              "description": "Producers whose claims about this fact are eligible, by the identity the application authenticated, most authoritative first. A member from any other producer is ineligible: it cannot win and is excluded when another member does. item.source never counts (R-15), and neither do a member's trust and injection_risk or the producer's verified flag (R-11): a route that prefers a verified server lists it earlier."
             },
             "scope": {
               "type": "array",
@@ -1232,7 +1310,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
           "max_tokens": {
             "type": "integer",
             "minimum": 0,
-            "description": "Cap on the slot's share of the payload: the tokens of its included items' rendered bodies, every occurrence counted (R-16). It holds whether or not the payload fits. After token_budget caps and before budget pressure, the slot sheds its own items in tier order until it is within the cap; protected items alone over it refuse the assembly with protected_content_over_budget. Absent, the slot has no cap and budget.input still bounds it."
+            "description": "Cap on the slot's share of the payload: the tokens of its included items' rendered bodies, every occurrence counted (R-16). It holds whether or not the payload fits. Protected items alone over it refuse the assembly with protected_content_over_budget before anything is reduced. Otherwise, after token_budget caps and before budget pressure, the slot sheds its own items in tier order until it is within the cap. Absent, the slot has no cap and budget.input still bounds it."
           },
           "min_tokens": {
             "type": "integer",
@@ -1540,7 +1618,9 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
           "required": [
             "slot",
             "item_id",
-            "tokens"
+            "tokens",
+            "source_version",
+            "eligibility"
           ],
           "additionalProperties": false
         }
@@ -1778,8 +1858,9 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
             }
           },
           "required": [
-            "items",
+            "group_id",
             "kind",
+            "items",
             "resolution",
             "decided_by"
           ],
@@ -1933,7 +2014,8 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$",
             "minLength": 64,
-            "maxLength": 64
+            "maxLength": 64,
+            "description": "Lowercase SHA-256 of the normalized snapshot, as conformance/README.md's Snapshot digest defines it (R-22)."
           }
         },
         "required": [
@@ -1941,7 +2023,8 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
           "assembly_time",
           "route_policy_version",
           "tokenizer",
-          "renderer"
+          "renderer",
+          "snapshot_digest"
         ],
         "additionalProperties": false
       },
@@ -1972,7 +2055,8 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
             "field"
           ],
           "additionalProperties": false
-        }
+        },
+        "description": "One record per item and policy field filled under R-3; an empty list when none were (R-22)."
       },
       "timings": {
         "type": "object",
@@ -2011,7 +2095,8 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
       "excluded",
       "conflicts",
       "refused",
-      "context"
+      "context",
+      "defaults_filled"
     ],
     "additionalProperties": false,
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2046,6 +2131,14 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
                 }
               },
               "type": "object"
+            },
+            "included": {
+              "type": "array",
+              "maxItems": 0
+            },
+            "compressed": {
+              "type": "array",
+              "maxItems": 0
             }
           },
           "type": "object"
@@ -2117,13 +2210,13 @@ export const REASONS = [
     "code": "producer_not_authenticated",
     "kind": "exclusion",
     "rule": "R-15",
-    "text": "The route policy does not list this batch's producer, or lists it with a different kind. Identity comes from the application's authentication and the route, never from item fields."
+    "text": "The route policy does not list this batch's producer, or lists it with a different kind. Identity comes from the application's authentication and the route, never from item fields. A snapshot with two batches from one producer is rejected before assembly."
   },
   {
     "code": "missing_field:<name>",
     "kind": "exclusion",
     "rule": "R-2",
-    "text": "A required field of the item itself is absent: one of the eight minimum fields, or a slot-specific one such as expires for memory or relevance for retrieval. A variant missing one of its fields is invalid_structure. Fix the producer; the assembler will not guess."
+    "text": "A required field of the item itself is absent: one of the eight minimum fields, or a slot-specific one such as expires for memory or relevance for knowledge. A variant missing one of its fields is invalid_structure. Fix the producer; the assembler will not guess."
   },
   {
     "code": "unknown_slot",
@@ -2153,13 +2246,13 @@ export const REASONS = [
     "code": "producer_slot_not_allowed",
     "kind": "exclusion",
     "rule": "R-15",
-    "text": "The authenticated producer is not permitted to emit into this slot: the route does not list the slot for it, or the slot is a state slot and the producer's kind is not state (R-8), whatever the route lists."
+    "text": "The authenticated producer is not permitted to emit into this slot: the route does not list the slot for it, or its kind rules the slot out whatever the route lists. State slots take only kind state (R-8), a memory producer only interaction.memory (R-14), a retrieval producer only the evidence slots (R-13), and an mcp producer only the evidence slots, plus governance.capabilities, where capability_not_allowed applies (R-15)."
   },
   {
     "code": "authority_not_allowed",
     "kind": "exclusion",
     "rule": "R-1",
-    "text": "The authority value is not allowed for this slot or authenticated producer. These roles are not a factual ranking."
+    "text": "The authority value is not allowed for this slot. Each slot takes its own role, a prior model turn in history takes untrusted, and only other items in tool results, memory and history may carry untrusted instead (R-1): never governance, knowledge, state or the query. These roles are not a factual ranking."
   },
   {
     "code": "capability_not_allowed",
@@ -2177,7 +2270,7 @@ export const REASONS = [
     "code": "untrusted_content_unmarked",
     "kind": "exclusion",
     "rule": "R-10",
-    "text": "User-controlled, retrieved or tool content is not marked injection_risk: untrusted_content, and the route has not verified its server."
+    "text": "The item is in a slot whose published injection_risk default is untrusted_content (evidence.knowledge, evidence.tool_results, interaction.memory, interaction.history or interaction.query) but is not marked untrusted_content, and no MCP server the route verified produced it (R-10, R-15)."
   },
   {
     "code": "protected_tier_changed",
@@ -2213,7 +2306,7 @@ export const REASONS = [
     "code": "future_freshness",
     "kind": "exclusion",
     "rule": "R-2",
-    "text": "freshness is later than assembly_time."
+    "text": "freshness is later than assembly_time by more than the route's clock_skew_seconds (default 0), compared at full precision."
   },
   {
     "code": "stale_state",
@@ -2224,32 +2317,32 @@ export const REASONS = [
   {
     "code": "source_invalid",
     "kind": "exclusion",
-    "rule": "R-9",
-    "text": "The item's source does not start with its slot's source_prefix. For memory, this is how the source turn is identified."
+    "rule": "R-3",
+    "text": "The item's source does not start with its slot's source_prefix. For memory, this is how the source turn is identified (R-9)."
   },
   {
     "code": "out_of_scope",
     "kind": "exclusion",
     "rule": "R-2",
-    "text": "Tenant, user or session scope does not match the request."
+    "text": "A scope key the item carries has a value other than the request's, or the request lacks that key, or the item lacks a key its slot's required_scope lists. A missing key is never a wildcard."
   },
   {
     "code": "below_threshold",
     "kind": "exclusion",
     "rule": "R-13",
-    "text": "The rerank score is under the route's versioned threshold."
+    "text": "The rerank score is under its slot's min_relevance, or the item has no score in a slot that sets one. A score equal to the threshold passes."
   },
   {
     "code": "not_eligible",
     "kind": "exclusion",
     "rule": "R-3",
-    "text": "The route's eligibility predicate rejected the item, for example because it was observed longer ago than its slot's max_age_seconds."
+    "text": "The item was observed longer ago than its slot's max_age_seconds, in a slot other than a state slot, where the code is stale_state. The slot-level eligibility rules are the complete predicate (R-3); no other rule excludes an item this way."
   },
   {
     "code": "slot_unplaced",
     "kind": "exclusion",
     "rule": "R-20",
-    "text": "The profile has no placement for the item's slot, and the item is not protected. A protected item in an unplaced slot is never excluded; assembly refuses with protected_slot_unplaced."
+    "text": "The profile has no placement for the item's slot, and the item is not protected. A protected item in an unplaced slot is never excluded; assembly refuses with protected_slot_unplaced. A profile that does not place instructions and query, or the output contract on a parser route, is rejected with its snapshot before assembly."
   },
   {
     "code": "conflict_deferred",
@@ -2260,7 +2353,7 @@ export const REASONS = [
   {
     "code": "conflict_lost",
     "kind": "exclusion",
-    "rule": "R-6",
+    "rule": "R-11",
     "text": "Route fact policy chose another member of the item's declared fact conflict group, by authenticated producer precedence or an allowed freshness tie-break. A protected item is never excluded this way; its group escalates."
   },
   {
@@ -2288,12 +2381,6 @@ export const REASONS = [
     "text": "The item was omitted to fit the rendered budget, its own token_budget or its slot's max_tokens, in tier order and by the route's fitting policy."
   },
   {
-    "code": "assembly_time_required",
-    "kind": "refusal",
-    "rule": "R-23",
-    "text": "The snapshot has no explicit, valid assembly_time. Assembly never reads an ambient clock."
-  },
-  {
     "code": "required_slot_missing",
     "kind": "refusal",
     "rule": "R-4",
@@ -2315,7 +2402,7 @@ export const REASONS = [
     "code": "protected_content_over_budget",
     "kind": "refusal",
     "rule": "R-17",
-    "text": "Protected content alone exceeds budget.input or its slot's max_tokens, or a protected item exceeds its own token_budget. The assembler refuses rather than truncating."
+    "text": "The payload rendered from protected content alone does not fit budget.input, charged with any margin_percent, or protected items exceed their slot's max_tokens, or a protected item exceeds its own token_budget. The assembler refuses rather than truncating."
   },
   {
     "code": "slot_floor_over_budget",

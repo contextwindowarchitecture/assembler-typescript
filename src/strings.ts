@@ -30,6 +30,14 @@ export function canonicalize(value: unknown): string {
   throw new TypeError(`RFC 8785 has no serialization for ${typeof value}`);
 }
 
+/** True when every number in the value is within the IEEE 754 double range (RFC 7493): JSON.parse reads 1e400 as Infinity. */
+export function hasFiniteNumbers(value: unknown): boolean {
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(hasFiniteNumbers);
+  if (value !== null && typeof value === 'object') return Object.values(value).every(hasFiniteNumbers);
+  return true;
+}
+
 /** True when no string in the value, member names included, holds an unpaired surrogate (RFC 7493). */
 export function isWellFormed(value: unknown): boolean {
   if (typeof value === 'string') return value.isWellFormed();

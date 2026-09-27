@@ -20,8 +20,12 @@ export const validateItem = validator('context_item.schema.json');
 export const validateTrace = validator('trace.schema.json');
 export const validateReport = validator('conformance_report.schema.json');
 
-/** Ajv's errors in words: the JSON Pointer of the value, then what is wrong with it. */
-export const describeErrors = (errors: ErrorObject[] | null | undefined): string[] =>
-  (errors ?? []).filter(error => error.keyword !== 'if')
-    .map(error => `${error.instancePath || '/'} ${error.message ?? 'is invalid'}${
+/** Ajv's errors in words: the JSON Pointer of the value, then what is wrong with it. A value that matches none of an
+ * anyOf's alternatives is one problem; the errors from inside each alternative are its detail, not problems of their own. */
+export function describeErrors(errors: ErrorObject[] | null | undefined): string[] {
+  const all = (errors ?? []).filter(error => error.keyword !== 'if');
+  const branches = all.filter(error => error.keyword === 'anyOf').map(error => `${error.schemaPath}/`);
+  return all.filter(error => !branches.some(prefix => error.schemaPath.startsWith(prefix)))
+    .map(error => `${error.instancePath || '/'} ${error.keyword === 'anyOf' ? 'matches none of its allowed forms' : error.message ?? 'is invalid'}${
       error.keyword === 'additionalProperties' ? `: ${String(error.params['additionalProperty'])}` : ''}`);
+}

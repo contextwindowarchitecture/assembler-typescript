@@ -105,6 +105,17 @@ export function admit(snapshot: Snapshot): Admission {
 
 type RouteProducer = NonNullable<Snapshot['route_policy']['producers'][string]>;
 
+const EVIDENCE = ['evidence.knowledge', 'evidence.tool_results'] as const;
+// A producer's kind limits its slots, whatever the route lists: retrieval and mcp output is evidence (R-13, R-15), and a
+// memory producer sends only memory (R-14). A tool specification an mcp producer sends to governance.capabilities falls
+// to the capability check, which excludes it with capability_not_allowed.
+const KIND_SLOTS: Readonly<Record<string, readonly string[]>> = {
+  retrieval: EVIDENCE, memory: ['interaction.memory'], mcp: [...EVIDENCE, 'governance.capabilities'],
+};
+// R-1: only these slots may carry untrusted instead of their own role. Not governance or knowledge, not state, which the
+// application writes (R-8), and not the query, which always carries user.
+const UNTRUSTED_ALLOWED: ReadonlySet<string> = new Set(['evidence.tool_results', 'interaction.memory', 'interaction.history']);
+
 /** The admission codes that apply to a schema-valid item from an authenticated producer, in any order. */
 function itemCodes(item: FilledItem, producer: string, route: RouteProducer, snapshot: Snapshot, now: Instant,
   skew: number, placed: Set<string>): string[] {
@@ -114,13 +125,15 @@ function itemCodes(item: FilledItem, producer: string, route: RouteProducer, sna
   const governance = item.slot.startsWith('governance.');
   const codes: string[] = [];
 
-  // R-15, R-8: the route lists the slot for this producer, and state comes only from producers of kind state.
-  if (!route.slots.includes(item.slot) || (item.slot.startsWith('state.') && route.kind !== 'state')) {
+  // R-15, R-8, R-13, R-14: the route lists the slot for this producer, state comes only from producers of kind state,
+  // and the producer's kind allows the slot.
+  const kindSlots = KIND_SLOTS[route.kind];
+  if (!route.slots.includes(item.slot) || (item.slot.startsWith('state.') && route.kind !== 'state') ||
+    (kindSlots !== undefined && !kindSlots.includes(item.slot))) {
     codes.push('producer_slot_not_allowed');
   }
-  // R-1: the slot's authority; non-governance slots other than knowledge may carry untrusted; model turns in
-  // history (lineage generated) must.
-  const untrustedAllowed = !governance && item.slot !== 'evidence.knowledge';
+  // R-1: the slot's authority, or untrusted where the slot allows it; model turns in history (lineage generated) must.
+  const untrustedAllowed = UNTRUSTED_ALLOWED.has(item.slot);
   if (item.authority !== defaults.authority && !(untrustedAllowed && item.authority === 'untrusted')) codes.push('authority_not_allowed');
   if (item.slot === 'interaction.history' && item.lineage === 'generated' && item.authority !== 'untrusted') codes.push('authority_not_allowed');
   // R-15: only the authenticated capability policy grants capabilities on the allow-list.
