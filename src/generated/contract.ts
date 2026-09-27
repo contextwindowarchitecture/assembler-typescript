@@ -2,7 +2,7 @@
 
 /** The website commit the vendored contract came from (vendor/cwa.lock.json). */
 export const CONTRACT_SOURCE = {
-  "website_commit": "2e5d48b5a6ab7fc1035ce8c63f27aac22c5b73fc",
+  "website_commit": "591f7eb2ee904acf79aa1a4f846253dd785a4423",
   "dirty": false
 } as const;
 
@@ -1469,7 +1469,8 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
           "policy_producer": {
             "type": "string",
             "minLength": 1,
-            "pattern": "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]"
+            "pattern": "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]",
+            "description": "The authenticated producer id of the route capability policy, which the route lists with kind capability_policy. Only its batch may carry governance.capabilities items, and only those in allowed_ids (R-15)."
           },
           "allow_list_version": {
             "type": "string",
@@ -2258,7 +2259,7 @@ export const REASONS = [
     "code": "capability_not_allowed",
     "kind": "exclusion",
     "rule": "R-15",
-    "text": "The authenticated emitter is not the route capability policy, or the tool is not on the route/user allow-list. Item source strings cannot prove permission."
+    "text": "The snapshot carries no capability grant, the authenticated emitter is not the producer the grant names as policy_producer listed by the route with kind capability_policy, or the tool is not on the grant's allow-list. Item source strings cannot prove permission."
   },
   {
     "code": "untrusted_in_governance",

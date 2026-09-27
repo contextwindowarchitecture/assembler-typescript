@@ -136,10 +136,13 @@ function itemCodes(item: FilledItem, producer: string, route: RouteProducer, sna
   const untrustedAllowed = UNTRUSTED_ALLOWED.has(item.slot);
   if (item.authority !== defaults.authority && !(untrustedAllowed && item.authority === 'untrusted')) codes.push('authority_not_allowed');
   if (item.slot === 'interaction.history' && item.lineage === 'generated' && item.authority !== 'untrusted') codes.push('authority_not_allowed');
-  // R-15: only the authenticated capability policy grants capabilities on the allow-list.
+  // R-15: only the route capability policy grants capabilities: the producer the grant names, which the route lists
+  // with kind capability_policy, and only the ids on the grant's allow-list.
   if (item.slot === 'governance.capabilities') {
     const grant = snapshot.capabilities;
-    if (!grant || grant.policy_producer !== producer || !grant.allowed_ids.includes(item.id)) codes.push('capability_not_allowed');
+    if (!grant || grant.policy_producer !== producer || route.kind !== 'capability_policy' || !grant.allowed_ids.includes(item.id)) {
+      codes.push('capability_not_allowed');
+    }
   }
   // R-10: governance is verified with no injection risk; untrusted material stays marked unless the route
   // verified the MCP server that produced it.

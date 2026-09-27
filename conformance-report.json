@@ -5,7 +5,7 @@
     "language": "TypeScript"
   },
   "contract": {
-    "website_commit": "2e5d48b5a6ab7fc1035ce8c63f27aac22c5b73fc",
+    "website_commit": "591f7eb2ee904acf79aa1a4f846253dd785a4423",
     "dirty": false
   },
   "cases": [
@@ -164,6 +164,15 @@
         "R-16",
         "R-18",
         "R-21"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "id": "capability-policy-kind",
+      "rules": [
+        "R-15",
+        "R-21",
+        "R-22"
       ],
       "outcome": "passed"
     },
@@ -498,6 +507,17 @@
         "R-21",
         "R-22",
         "R-25"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "id": "threshold-beyond-2-53",
+      "rules": [
+        "R-2",
+        "R-13",
+        "R-16",
+        "R-21",
+        "R-22"
       ],
       "outcome": "passed"
     },

@@ -643,6 +643,9 @@ export interface CWAAssemblySnapshot {
     excluded: Excluded;
   }[];
   capabilities?: {
+    /**
+     * The authenticated producer id of the route capability policy, which the route lists with kind capability_policy. Only its batch may carry governance.capabilities items, and only those in allowed_ids (R-15).
+     */
     policy_producer: string;
     allow_list_version: string;
     allowed_ids: string[];
