@@ -20,7 +20,7 @@ const ids = (dir: string): string[] => (existsSync(dir) ? readdirSync(dir).sort(
 const rulesOf = (dir: string): string[] => (readJson(join(dir, 'case.json')) as { rules: string[] }).rules;
 const describe = (error: unknown): string => (error instanceof Error ? `${error.name}: ${error.message}` : String(error));
 
-/** Why a snapshot would be skipped: it names a tokenizer or renderer this implementation does not provide. */
+/** Why a case would be skipped: its snapshot names a tokenizer or renderer this implementation does not provide. */
 function unsupported(snapshot: unknown): string | undefined {
   const { tokenizer, renderer } = (snapshot ?? {}) as { tokenizer?: unknown; renderer?: unknown };
   if (typeof tokenizer === 'string' && !Object.hasOwn(TOKENIZERS, tokenizer)) return `tokenizer ${tokenizer} is not provided`;
@@ -82,10 +82,11 @@ function runCase(dir: string): Pick<CaseRow, 'outcome' | 'detail'> {
   return difference ? { outcome: 'failed', detail: `the trace differs at ${difference}` } : { outcome: 'passed' };
 }
 
+/** Every snapshot check but realizability runs before a renderer is needed, and none needs a tokenizer, so a rejection
+ * snapshot is skipped only when it names a renderer this implementation lacks and breaks no other check: assemble()
+ * rejects it before resolving either component (Reporting results). */
 function runRejection(dir: string): Pick<RejectionRow, 'outcome' | 'detail'> {
   const snapshot = readJson(join(dir, 'snapshot.json'));
-  const skip = unsupported(snapshot);
-  if (skip) return { outcome: 'skipped', detail: skip };
   try {
     const { trace } = assemble(snapshot);
     return { outcome: 'failed', detail: trace.refused.bool ? `refused with ${String(trace.refused.reason)} instead of rejecting` : 'assembled a payload instead of rejecting' };

@@ -65,16 +65,39 @@ test('a case whose payload or trace differs fails, and the detail says where', (
 });
 
 test('a case with an unknown tokenizer or renderer is skipped, and the detail names it', () => {
-  const dir = scratch(['fixture-three-slot'], ['profile-route-mismatch']);
+  const dir = scratch(['fixture-three-slot'], []);
   try {
-    for (const path of [join(dir, 'cases', 'fixture-three-slot', 'snapshot.json'), join(dir, 'rejections', 'profile-route-mismatch', 'snapshot.json')]) {
-      const snapshot = JSON.parse(readFileSync(path, 'utf8')) as { renderer: string };
-      snapshot.renderer = 'some-renderer/v1';
-      writeFileSync(path, JSON.stringify(snapshot));
-    }
+    const path = join(dir, 'cases', 'fixture-three-slot', 'snapshot.json');
+    const snapshot = JSON.parse(readFileSync(path, 'utf8')) as { renderer: string };
+    snapshot.renderer = 'some-renderer/v1';
+    writeFileSync(path, JSON.stringify(snapshot));
     const report = runConformance(dir);
     assert.deepEqual(report.cases[0], { id: 'fixture-three-slot', rules: ['R-9', 'R-21', 'R-22', 'R-23'], outcome: 'skipped', detail: 'renderer some-renderer/v1 is not provided' });
-    assert.equal(report.rejections![0]!.outcome, 'skipped');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a rejection snapshot is skipped only when its renderer is missing and the check it breaks is the renderer's", () => {
+  // Reporting results: every other check runs before a renderer is needed, and none needs a tokenizer, so such a
+  // snapshot is rejected whatever it names.
+  const dir = scratch([], ['profile-route-mismatch', 'profile-unrealizable', 'schema-missing-budget']);
+  try {
+    const rename = (id: string, component: 'tokenizer' | 'renderer') => {
+      const path = join(dir, 'rejections', id, 'snapshot.json');
+      const snapshot = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+      snapshot[component] = `some-${component}/v1`;
+      writeFileSync(path, JSON.stringify(snapshot));
+    };
+    rename('profile-route-mismatch', 'renderer');
+    rename('schema-missing-budget', 'tokenizer');
+    rename('profile-unrealizable', 'renderer');
+    const report = runConformance(dir);
+    const outcome = (id: string) => report.rejections!.find(r => r.id === id)!;
+    assert.equal(outcome('profile-route-mismatch').outcome, 'rejected');
+    assert.equal(outcome('schema-missing-budget').outcome, 'rejected');
+    assert.equal(outcome('profile-unrealizable').outcome, 'skipped');
+    assert.equal(outcome('profile-unrealizable').detail, 'renderer some-renderer/v1 is not provided');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
