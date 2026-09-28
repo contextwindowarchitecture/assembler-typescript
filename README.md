@@ -7,7 +7,7 @@ Status: in development (M13). It passes all 52 published conformance cases byte 
 ## Install
 
 ```sh
-npm install @contextwindowarchitecture/assembler
+pnpm add @contextwindowarchitecture/assembler
 ```
 
 ## Use
