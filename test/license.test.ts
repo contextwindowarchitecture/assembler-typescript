@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './root.js';
 
@@ -15,10 +15,18 @@ test('the package is Apache-2.0, like the specification it implements', () => {
 });
 
 test('the packed package carries LICENSE and NOTICE', () => {
-  const [pack] = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: ROOT, encoding: 'utf8' })) as
-    { files: { path: string }[] }[];
-  const paths = pack!.files.map(file => file.path);
+  const pack = JSON.parse(execFileSync('pnpm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: ROOT, encoding: 'utf8' })) as
+    { files: { path: string }[] };
+  const paths = pack.files.map(file => file.path);
   for (const path of ['LICENSE', 'NOTICE']) assert.ok(paths.includes(path), path);
+});
+
+test('the package is installed and run with pnpm, from its lockfile', () => {
+  const pkg = JSON.parse(read('package.json')) as { packageManager?: string; scripts: Record<string, string> };
+  assert.match(pkg.packageManager ?? '', /^pnpm@\d+\.\d+\.\d+$/);
+  assert.ok(existsSync(join(ROOT, 'pnpm-lock.yaml')), 'pnpm-lock.yaml');
+  assert.ok(!existsSync(join(ROOT, 'package-lock.json')), 'package-lock.json must not exist');
+  for (const [name, script] of Object.entries(pkg.scripts)) assert.doesNotMatch(script, /\bnpm\b/, name);
 });
 
 test('the package publishes publicly under its scope, and only after a build that passes the tests', () => {
@@ -26,8 +34,8 @@ test('the package publishes publicly under its scope, and only after a build tha
   assert.match(pkg.name, /^@contextwindowarchitecture\//);
   assert.notEqual(pkg.private, true);
   assert.equal(pkg.publishConfig?.access, 'public');
-  assert.match(pkg.scripts['prepublishOnly'] ?? '', /npm test/);
-  assert.match(pkg.scripts['prepublishOnly'] ?? '', /npm run build/);
+  assert.match(pkg.scripts['prepublishOnly'] ?? '', /pnpm test/);
+  assert.match(pkg.scripts['prepublishOnly'] ?? '', /pnpm run build/);
 });
 
 test('the package names its GitHub repository, the one its origin remote points at', () => {

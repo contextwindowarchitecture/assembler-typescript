@@ -11,6 +11,7 @@
   "engines": {
     "node": ">=22"
   },
+  "packageManager": "pnpm@12.3.4",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -24,11 +25,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:test": "tsc -p tsconfig.test.json",
-    "test": "npm run build:test && node --test \"build/test/**/*.test.js\"",
+    "test": "pnpm run build:test && node --test \"build/test/**/*.test.js\"",
     "vendor": "node scripts/vendor-contract.mjs",
     "generate": "node scripts/generate.mjs",
-    "conformance": "npm run build && node dist/cli/conformance.js vendor/cwa/conformance conformance-report.json",
-    "prepublishOnly": "npm test && npm run build"
+    "conformance": "pnpm run build && node dist/cli/conformance.js vendor/cwa/conformance conformance-report.json",
+    "prepublishOnly": "pnpm test && pnpm run build"
   },
   "devDependencies": {
     "@types/node": "22.20.4",

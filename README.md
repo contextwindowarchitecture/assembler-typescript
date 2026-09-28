@@ -32,10 +32,12 @@ Node.js 22 or newer. The package is ESM only and compiled with `tsc` to JavaScri
 ## Development
 
 ```sh
-npm ci
-npm run build
-npm test
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm test
 ```
+
+pnpm is the package manager. `packageManager` in `package.json` pins its version, which pnpm switches to by itself, and `pnpm-lock.yaml` pins every dependency.
 
 ## Cost
 
@@ -44,7 +46,7 @@ Every reduction under budget pressure is its own fit test, and every fit test re
 ## Conformance
 
 ```sh
-npm run conformance
+pnpm run conformance
 ```
 
 This runs every vendored case and rejection snapshot as `conformance/README.md` describes. It writes `conformance-report.json`, valid against `schema/conformance_report.schema.json`, and exits 1 unless every case passed and every rejection snapshot was rejected. A case passes only when its payload matches byte for byte and its trace matches field for field, except `trace_id` and `timings`. The committed report is the current run: a test fails when it goes stale. `runConformance(dir)` in `src/conformance.ts` does the same from code. A case is skipped when its snapshot names a tokenizer or renderer this package does not provide. A rejection snapshot is skipped only when it names a renderer this package lacks and the check it breaks is the renderer's; every other check runs before a renderer is needed, so the snapshot is rejected whatever it names.
@@ -55,7 +57,7 @@ This runs every vendored case and rejection snapshot as `conformance/README.md` 
 
 ## Publishing
 
-`npm publish` publishes with public access (`publishConfig`). `prepublishOnly` runs the tests and a fresh build first, so a failing or stale `dist/` is never published. The tarball holds `dist/`, `LICENSE`, `NOTICE`, `README.md` and `package.json`.
+`pnpm publish` publishes with public access (`publishConfig`). `prepublishOnly` runs the tests and a fresh build first, so a failing or stale `dist/` is never published. The tarball holds `dist/`, `LICENSE`, `NOTICE`, `README.md` and `package.json`.
 
 See [AGENTS.md](AGENTS.md) for the working rules.
 

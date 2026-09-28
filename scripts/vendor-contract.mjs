@@ -1,5 +1,5 @@
 // Copies the published CWA contract from a website checkout into vendor/cwa/ and pins every file by SHA-256
-// in vendor/cwa.lock.json, with the website commit it came from. Usage: npm run vendor -- <website checkout>
+// in vendor/cwa.lock.json, with the website commit it came from. Usage: pnpm run vendor <website checkout>
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -15,7 +15,7 @@ const SOURCES = ['LICENSE', 'NOTICE', 'schema', 'contract/requirements.json', 'c
 
 const web = process.argv[2];
 if (!web) {
-  console.error('usage: npm run vendor -- <website checkout>');
+  console.error('usage: pnpm run vendor <website checkout>');
   process.exit(2);
 }
 const git = (...args) => execFileSync('git', ['-C', web, ...args], { encoding: 'utf8' }).trim();
