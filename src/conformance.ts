@@ -52,9 +52,14 @@ export function firstDifference(expected: unknown, actual: unknown, path = ''): 
   return `${path || '/'}: expected ${show(expected)}, got ${show(actual)}`;
 }
 
-/** Trace ids and timings may differ between runs (R-23); every other member is compared. */
-const comparable = (trace: unknown): unknown => {
+/** A trace as Running a case compares it: without trace_id, timings and recovery.detail, which may differ (R-23).
+ * recovery.detail is free text for people that no requirement defines. Every other member is compared. */
+export const comparable = (trace: unknown): unknown => {
   const { trace_id: _id, timings: _timings, ...rest } = trace as Record<string, unknown>;
+  if (rest['recovery'] !== null && typeof rest['recovery'] === 'object') {
+    const { detail: _detail, ...recovery } = rest['recovery'] as Record<string, unknown>;
+    rest['recovery'] = recovery;
+  }
   return rest;
 };
 

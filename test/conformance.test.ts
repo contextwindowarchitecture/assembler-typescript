@@ -1,17 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { assemble, SnapshotRejectedError } from '../src/index.js';
+import { comparable } from '../src/conformance.js';
 import { validateTrace } from '../src/schemas.js';
 import { loadCases, loadRejections } from './cases.js';
 
 // Cases this implementation does not pass yet. The list only shrinks; it is empty when M13 is done.
 const PENDING = new Set<string>([]);
 
-// Trace ids and timings may differ between runs (R-23); everything else is compared.
-const comparable = (trace: object): object => {
-  const { trace_id: _id, timings: _timings, ...rest } = trace as Record<string, unknown>;
-  return rest;
-};
+// The trace is compared as Running a case compares it: without trace_id, timings and recovery.detail.
 
 for (const c of loadCases()) {
   test(`case ${c.id}`, { todo: PENDING.has(c.id) }, () => {

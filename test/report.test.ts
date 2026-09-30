@@ -64,6 +64,28 @@ test('a case whose payload or trace differs fails, and the detail says where', (
   }
 });
 
+test('recovery.detail is left out of the trace comparison, and the rest of recovery is compared (Running a case)', () => {
+  // recovery.detail is free text for people, and no requirement defines its content.
+  const dir = scratch(['conflict-request-context', 'evidence-precompute-summary'], []);
+  try {
+    const tamper = (id: string, change: (recovery: Record<string, unknown>) => void) => {
+      const path = join(dir, 'cases', id, 'expected.trace.json');
+      const trace = JSON.parse(readFileSync(path, 'utf8')) as { recovery: Record<string, unknown> };
+      change(trace.recovery);
+      writeFileSync(path, JSON.stringify(trace));
+    };
+    tamper('evidence-precompute-summary', recovery => { recovery['detail'] = 'Summarize the refund policy ahead of time.'; });
+    tamper('conflict-request-context', recovery => { recovery['action'] = 'precompute_summary'; });
+    const report = runConformance(dir);
+    const outcome = (id: string) => report.cases.find(c => c.id === id)!;
+    assert.equal(outcome('evidence-precompute-summary').outcome, 'passed', outcome('evidence-precompute-summary').detail);
+    assert.equal(outcome('conflict-request-context').outcome, 'failed');
+    assert.match(outcome('conflict-request-context').detail!, /\/recovery\/action/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a case with an unknown tokenizer or renderer is skipped, and the detail names it', () => {
   const dir = scratch(['fixture-three-slot'], []);
   try {
