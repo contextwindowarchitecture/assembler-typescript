@@ -31,7 +31,9 @@ export const realizationProblems = (renderer: string, placement: Placement): str
   Object.hasOwn(REALIZE, renderer) ? REALIZE[renderer]!(placement) : [];
 
 /** The renderers this package provides, the only ones it renders with: it takes none of the application's own
- * (R-16). The list is frozen, so a caller cannot add an ID assemble() would accept and fail to render. */
+ * (R-16). The list is frozen, so a caller cannot add an ID assemble() would accept and fail to render. A test holds
+ * it to the renderers conformance/README.md publishes, which every implementation provides, so the conformance runner
+ * also reads it as the required renderers (Reporting results). */
 export const RENDERERS: readonly string[] = Object.freeze(Object.keys(REALIZE));
 
 /** An item as the renderer sees it: the body is its current one, a variant once fitting has compressed it. */

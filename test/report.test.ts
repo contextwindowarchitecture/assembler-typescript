@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runConformance } from '../src/conformance.js';
+import { componentOutcome, runConformance } from '../src/conformance.js';
 import { IMPLEMENTATION } from '../src/implementation.js';
 import { validateReport } from '../src/schemas.js';
 import { CONFORMANCE } from './cases.js';
@@ -86,40 +86,94 @@ test('recovery.detail is left out of the trace comparison, and the rest of recov
   }
 });
 
-test('a case with an unknown tokenizer or renderer is skipped, and the detail names it', () => {
-  const dir = scratch(['fixture-three-slot'], []);
+/** Names `some-<component>/v1` in a scratch snapshot: an optional component, since the README requires only its own. */
+function rename(dir: string, kind: 'cases' | 'rejections', id: string, component: 'tokenizer' | 'renderer'): void {
+  const path = join(dir, kind, id, 'snapshot.json');
+  const snapshot = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+  snapshot[component] = `some-${component}/v1`;
+  writeFileSync(path, JSON.stringify(snapshot));
+}
+
+test('a case with an optional tokenizer or renderer this package lacks is skipped, and the detail names it', () => {
+  const dir = scratch(['fixture-three-slot', 'messages-render'], []);
   try {
-    const path = join(dir, 'cases', 'fixture-three-slot', 'snapshot.json');
-    const snapshot = JSON.parse(readFileSync(path, 'utf8')) as { renderer: string };
-    snapshot.renderer = 'some-renderer/v1';
-    writeFileSync(path, JSON.stringify(snapshot));
+    rename(dir, 'cases', 'fixture-three-slot', 'renderer');
+    rename(dir, 'cases', 'messages-render', 'tokenizer');
     const report = runConformance(dir);
     assert.deepEqual(report.cases[0], { id: 'fixture-three-slot', rules: ['R-9', 'R-21', 'R-22', 'R-23'], outcome: 'skipped', detail: 'renderer some-renderer/v1 is not provided' });
+    assert.deepEqual([report.cases[1]!.outcome, report.cases[1]!.detail], ['skipped', 'tokenizer some-tokenizer/v1 is not provided']);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("a rejection snapshot is skipped only when its renderer is missing and the check it breaks is the renderer's", () => {
+test('a case that uses only required components is never skipped: one the implementation lacks fails it (Reporting results)', () => {
+  // This package provides all four the README requires, so no published case reaches this; an implementation made
+  // to lack two of them shows the decision.
+  const lacking = { tokenizer: ['fixture-whitespace/v1'], renderer: ['fixture-xml/v1'] };
+  const both = ['tokenizer', 'renderer'] as const;
+  assert.equal(componentOutcome({ tokenizer: 'estimate-utf8/v1', renderer: 'cwa-messages/v1' }, both), undefined);
+  assert.equal(componentOutcome({ tokenizer: 'fixture-whitespace/v1', renderer: 'fixture-xml/v1' }, both, lacking), undefined);
+  assert.deepEqual(componentOutcome({ tokenizer: 'estimate-utf8/v1', renderer: 'fixture-xml/v1' }, both, lacking),
+    { outcome: 'failed', detail: 'tokenizer estimate-utf8/v1 is required and not provided' });
+  assert.deepEqual(componentOutcome({ tokenizer: 'fixture-whitespace/v1', renderer: 'cwa-messages/v1' }, both, lacking),
+    { outcome: 'failed', detail: 'renderer cwa-messages/v1 is required and not provided' });
+  // An optional component the implementation lacks still skips the case, even beside a required one it lacks: the
+  // case uses an optional one the implementation does not provide.
+  assert.deepEqual(componentOutcome({ tokenizer: 'fixture-whitespace/v1', renderer: 'some-renderer/v1' }, both, lacking),
+    { outcome: 'skipped', detail: 'renderer some-renderer/v1 is not provided' });
+  assert.deepEqual(componentOutcome({ tokenizer: 'estimate-utf8/v1', renderer: 'some-renderer/v1' }, both, lacking),
+    { outcome: 'skipped', detail: 'renderer some-renderer/v1 is not provided' });
+  assert.deepEqual(componentOutcome({ tokenizer: 'some-tokenizer/v1', renderer: 'cwa-messages/v1' }, both, lacking),
+    { outcome: 'skipped', detail: 'tokenizer some-tokenizer/v1 is not provided' });
+});
+
+test('a rejection snapshot needs only its renderer: a required one the implementation lacks fails it, an optional one skips it', () => {
+  // Reporting results: no snapshot check needs a tokenizer, so a rejection snapshot is skipped only for an optional
+  // renderer, and never for one the README requires.
+  const lacking = { tokenizer: [], renderer: ['fixture-xml/v1'] };
+  assert.equal(componentOutcome({ tokenizer: 'some-tokenizer/v1', renderer: 'fixture-xml/v1' }, ['renderer'], lacking), undefined);
+  assert.deepEqual(componentOutcome({ tokenizer: 'some-tokenizer/v1', renderer: 'cwa-messages/v1' }, ['renderer'], lacking),
+    { outcome: 'failed', detail: 'renderer cwa-messages/v1 is required and not provided' });
+  assert.deepEqual(componentOutcome({ tokenizer: 'fixture-whitespace/v1', renderer: 'some-renderer/v1' }, ['renderer'], lacking),
+    { outcome: 'skipped', detail: 'renderer some-renderer/v1 is not provided' });
+});
+
+test("a rejection snapshot is skipped only when its renderer is optional and missing and the check it breaks is the renderer's", () => {
   // Reporting results: every other check runs before a renderer is needed, and none needs a tokenizer, so such a
-  // snapshot is rejected whatever it names.
-  const dir = scratch([], ['profile-route-mismatch', 'profile-unrealizable', 'schema-missing-budget']);
+  // snapshot is rejected whatever it names, and a missing tokenizer beside the renderer does not change the detail.
+  const dir = scratch([], ['messages-system-after-xml', 'profile-route-mismatch', 'profile-unrealizable', 'schema-missing-budget']);
   try {
-    const rename = (id: string, component: 'tokenizer' | 'renderer') => {
-      const path = join(dir, 'rejections', id, 'snapshot.json');
-      const snapshot = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
-      snapshot[component] = `some-${component}/v1`;
-      writeFileSync(path, JSON.stringify(snapshot));
-    };
-    rename('profile-route-mismatch', 'renderer');
-    rename('schema-missing-budget', 'tokenizer');
-    rename('profile-unrealizable', 'renderer');
+    rename(dir, 'rejections', 'profile-route-mismatch', 'renderer');
+    rename(dir, 'rejections', 'schema-missing-budget', 'tokenizer');
+    rename(dir, 'rejections', 'profile-unrealizable', 'renderer');
+    rename(dir, 'rejections', 'messages-system-after-xml', 'tokenizer');
+    rename(dir, 'rejections', 'messages-system-after-xml', 'renderer');
     const report = runConformance(dir);
     const outcome = (id: string) => report.rejections!.find(r => r.id === id)!;
     assert.equal(outcome('profile-route-mismatch').outcome, 'rejected');
     assert.equal(outcome('schema-missing-budget').outcome, 'rejected');
     assert.equal(outcome('profile-unrealizable').outcome, 'skipped');
     assert.equal(outcome('profile-unrealizable').detail, 'renderer some-renderer/v1 is not provided');
+    assert.deepEqual([outcome('messages-system-after-xml').outcome, outcome('messages-system-after-xml').detail],
+      ['skipped', 'renderer some-renderer/v1 is not provided']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a rejection snapshot that breaks no check fails, even when it names a tokenizer this package lacks', () => {
+  // No check needs a tokenizer, so a missing one never skips a rejection snapshot (Reporting results).
+  const dir = scratch([], ['profile-route-mismatch']);
+  try {
+    const path = join(dir, 'rejections', 'profile-route-mismatch', 'snapshot.json');
+    const snapshot = JSON.parse(readFileSync(path, 'utf8')) as { profile: { route: string }; tokenizer: string };
+    snapshot.profile.route = 'contract-fixture';
+    snapshot.tokenizer = 'some-tokenizer/v1';
+    writeFileSync(path, JSON.stringify(snapshot));
+    const [row] = runConformance(dir).rejections!;
+    assert.equal(row!.outcome, 'failed');
+    assert.match(row!.detail!, /tokenizer some-tokenizer\/v1 is not provided/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

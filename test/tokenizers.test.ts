@@ -9,7 +9,8 @@ import { CONFORMANCE } from './cases.js';
 test('the published tokenizers are the ones conformance/README.md lists', () => {
   // Tokenizers and renderers lists one bullet per published component: a tokenizer's bullet says it "counts" a text,
   // and every other bullet is a renderer's. A re-vendor that publishes a tokenizer fails here until
-  // PUBLISHED_TOKENIZERS names it.
+  // PUBLISHED_TOKENIZERS names it. Every implementation provides these bullets, and the conformance runner reads both
+  // lists as the required components (Reporting results).
   const readme = readFileSync(join(CONFORMANCE, 'README.md'), 'utf8');
   const section = readme.split(/^## /m).find(part => part.startsWith('Tokenizers and renderers\n'))!;
   const bullets = [...section.matchAll(/^- `([^`]+)` (\w+) /gm)].map(([, id, verb]) => ({ id: id!, verb: verb! }));

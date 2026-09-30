@@ -6,7 +6,8 @@ export class SnapshotRejectedError extends Error {
   }
 }
 
-/** The snapshot names a tokenizer or renderer this implementation does not provide. The case is skipped. */
+/** The snapshot names a tokenizer or renderer this implementation does not provide. The conformance runner skips a
+ * case for an optional one and fails it for a required one (conformance/README.md, Reporting results). */
 export class UnsupportedComponentError extends Error {
   constructor(readonly component: 'tokenizer' | 'renderer', readonly id: string) {
     super(`${component} ${id} is not provided`);

@@ -9,7 +9,7 @@ import { IMPLEMENTATION } from './implementation.js';
 import { RENDERERS } from './renderers.js';
 import { validateTrace } from './schemas.js';
 import { compareStrings } from './strings.js';
-import { TOKENIZERS } from './tokenizers.js';
+import { PUBLISHED_TOKENIZERS, TOKENIZERS } from './tokenizers.js';
 import type { ConformanceReport } from './types.js';
 
 type CaseRow = ConformanceReport['cases'][number];
@@ -20,12 +20,37 @@ const ids = (dir: string): string[] => (existsSync(dir) ? readdirSync(dir).sort(
 const rulesOf = (dir: string): string[] => (readJson(join(dir, 'case.json')) as { rules: string[] }).rules;
 const describe = (error: unknown): string => (error instanceof Error ? `${error.name}: ${error.message}` : String(error));
 
-/** Why a case would be skipped: its snapshot names a tokenizer or renderer this implementation does not provide. */
-function unsupported(snapshot: unknown): string | undefined {
-  const { tokenizer, renderer } = (snapshot ?? {}) as { tokenizer?: unknown; renderer?: unknown };
-  if (typeof tokenizer === 'string' && !Object.hasOwn(TOKENIZERS, tokenizer)) return `tokenizer ${tokenizer} is not provided`;
-  if (typeof renderer === 'string' && !RENDERERS.includes(renderer)) return `renderer ${renderer} is not provided`;
-  return undefined;
+type Component = 'tokenizer' | 'renderer';
+
+/** The IDs of the tokenizers and renderers an implementation provides. */
+export type Provided = Readonly<Record<Component, readonly string[]>>;
+
+/** What this package provides: the own keys of TOKENIZERS, and RENDERERS. */
+const PROVIDED: Provided = { tokenizer: Object.keys(TOKENIZERS), renderer: RENDERERS };
+
+/** What every implementation provides: the bullets under Tokenizers and renderers, today every published component.
+ * A test holds PUBLISHED_TOKENIZERS and RENDERERS to those bullets. Any other ID is optional. */
+const REQUIRED: Provided = { tokenizer: PUBLISHED_TOKENIZERS, renderer: RENDERERS };
+
+/**
+ * The outcome Reporting results gives a run that needs a component the implementation does not provide, or
+ * undefined when it provides every one the run needs. A case needs its snapshot's tokenizer and renderer; a
+ * rejection snapshot needs only its renderer, since no snapshot check needs a tokenizer. An optional component it
+ * lacks skips the run, whatever else it lacks. Otherwise a required one it lacks fails the run: a case that uses only
+ * required components is never skipped. `detail` names the component. `provided` is this package's unless a test
+ * makes an implementation lack one, which no published case can.
+ */
+export function componentOutcome(snapshot: unknown, needs: readonly Component[], provided: Provided = PROVIDED):
+  { outcome: 'skipped' | 'failed'; detail: string } | undefined {
+  const named = (snapshot ?? {}) as Partial<Record<Component, unknown>>;
+  const missing = needs.flatMap(component => {
+    const id = named[component];
+    return typeof id === 'string' && !provided[component].includes(id) ? [{ component, id }] : [];
+  });
+  const optional = missing.find(({ component, id }) => !REQUIRED[component].includes(id));
+  if (optional) return { outcome: 'skipped', detail: `${optional.component} ${optional.id} is not provided` };
+  const [required] = missing;
+  return required && { outcome: 'failed', detail: `${required.component} ${required.id} is required and not provided` };
 }
 
 /** The JSON Pointer of the first place two JSON values differ, with both values; undefined when they are equal. */
@@ -65,8 +90,8 @@ export const comparable = (trace: unknown): unknown => {
 
 function runCase(dir: string): Pick<CaseRow, 'outcome' | 'detail'> {
   const snapshot = readJson(join(dir, 'snapshot.json'));
-  const skip = unsupported(snapshot);
-  if (skip) return { outcome: 'skipped', detail: skip };
+  const missing = componentOutcome(snapshot, ['tokenizer', 'renderer']);
+  if (missing) return missing;
   const payloadPath = join(dir, 'expected.payload.txt');
   const expectedPayload = existsSync(payloadPath) ? readFileSync(payloadPath) : null;
   let result;
@@ -87,9 +112,11 @@ function runCase(dir: string): Pick<CaseRow, 'outcome' | 'detail'> {
   return difference ? { outcome: 'failed', detail: `the trace differs at ${difference}` } : { outcome: 'passed' };
 }
 
-/** Every snapshot check but realizability runs before a renderer is needed, and none needs a tokenizer, so a rejection
- * snapshot is skipped only when it names a renderer this implementation lacks and breaks no other check: assemble()
- * rejects it before resolving either component (Reporting results). */
+/** Every snapshot check but realizability runs before a renderer is needed, and none needs a tokenizer, so assemble()
+ * rejects a rejection snapshot before resolving either component unless the check it breaks is the renderer's. It
+ * gets that far only when the snapshot breaks no check it can run: the snapshot is skipped when it names an optional
+ * renderer this implementation lacks, and fails otherwise, when that renderer is required or when only the tokenizer
+ * is missing (Reporting results). */
 function runRejection(dir: string): Pick<RejectionRow, 'outcome' | 'detail'> {
   const snapshot = readJson(join(dir, 'snapshot.json'));
   try {
@@ -97,7 +124,7 @@ function runRejection(dir: string): Pick<RejectionRow, 'outcome' | 'detail'> {
     return { outcome: 'failed', detail: trace.refused.bool ? `refused with ${String(trace.refused.reason)} instead of rejecting` : 'assembled a payload instead of rejecting' };
   } catch (error) {
     if (error instanceof SnapshotRejectedError) return { outcome: 'rejected' };
-    if (error instanceof UnsupportedComponentError) return { outcome: 'skipped', detail: error.message };
+    if (error instanceof UnsupportedComponentError) return componentOutcome(snapshot, ['renderer']) ?? { outcome: 'failed', detail: describe(error) };
     return { outcome: 'failed', detail: describe(error) };
   }
 }
