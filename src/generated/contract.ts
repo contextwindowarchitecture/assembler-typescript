@@ -2,7 +2,7 @@
 
 /** The website commit the vendored contract came from (vendor/cwa.lock.json). */
 export const CONTRACT_SOURCE = {
-  "website_commit": "591f7eb2ee904acf79aa1a4f846253dd785a4423",
+  "website_commit": "4f32396ebc9da4f08980e672280a06a3448b6a41",
   "dirty": false
 } as const;
 
@@ -468,7 +468,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
       },
       "relevance": {
         "type": "number",
-        "description": "Finite rerank score; the scale and threshold belong to versioned route policy."
+        "description": "Finite rerank score; the scale and threshold belong to versioned route policy. Required in evidence.knowledge (R-13)."
       },
       "revoked_by": {
         "type": "string",
@@ -520,7 +520,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
           "properties": {
             "relevance": {
               "type": "number",
-              "description": "Finite rerank score; the scale and threshold belong to versioned route policy."
+              "description": "Finite rerank score; the scale and threshold belong to versioned route policy. Required in evidence.knowledge (R-13)."
             }
           }
         }
@@ -781,7 +781,8 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
             "anyOf": [
               {
                 "type": "string",
-                "format": "date"
+                "format": "date",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(?![\\s\\S])"
               },
               {
                 "type": "null"
@@ -1025,6 +1026,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
             },
             "slots": {
               "type": "array",
+              "description": "Slots this producer may send. An item in any other slot is excluded with producer_slot_not_allowed (R-15). The producer's kind limits its slots further, whatever this list holds (R-8, R-13, R-14, R-15).",
               "items": {
                 "$ref": "context_item.schema.json#/properties/slot"
               },
@@ -1102,7 +1104,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
         "propertyNames": {
           "$ref": "context_item.schema.json#/properties/slot"
         },
-        "description": "Tiers this route raises above the slot default. Only raising is meaningful; items cannot raise their own (R-16).",
+        "description": "Tiers this route raises above the slot default; items cannot raise their own (R-16). A value at or below the default changes nothing: the effective tier is the higher of the two.",
         "additionalProperties": {
           "type": "string",
           "enum": [
@@ -1114,7 +1116,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
       "fitting_order": {
         "type": "array",
         "uniqueItems": true,
-        "description": "The order in which compressible items are reduced under budget pressure, once every droppable item is gone (R-16). Item token_budget caps and slot max_tokens caps apply before it, whether or not the payload fits. Each step compresses (selects supplied variants for) or omits one slot's compressible items, lowest-ranked first, until the payload fits. Steps the route does not list follow in the default order: compress each slot, then omit each slot, both in shedding order. With no steps, variants always come before omission.",
+        "description": "The order in which compressible items are reduced: under budget pressure, once every droppable item a slot floor does not hold is gone, and, for the steps that name a slot, while that slot's max_tokens cap is enforced (R-16). Item token_budget caps apply first, whether or not the payload fits. Each step compresses (selects supplied variants for) or omits one slot's compressible items, lowest-ranked first, until the payload fits or the slot is within its cap; under budget pressure a slot floor can withhold a reduction (conformance/README.md, Fitting). Steps the route does not list follow in the default order: compress each slot, then omit each slot, both in shedding order. With no steps, variants always come before omission.",
         "items": {
           "type": "object",
           "additionalProperties": false,
@@ -1257,7 +1259,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
         "properties": {
           "min_relevance": {
             "type": "number",
-            "description": "Items scoring below this rerank threshold are excluded as below_threshold (R-13). An item with no relevance cannot clear a threshold and is excluded the same way. A score equal to the threshold passes."
+            "description": "Items scoring below this rerank threshold are excluded as below_threshold (R-13). An item with no relevance cannot clear a threshold and is excluded the same way, except in evidence.knowledge, where relevance is required and an item without it is missing_field:relevance (R-13). A score equal to the threshold passes."
           },
           "max_age_seconds": {
             "type": "integer",
@@ -1305,7 +1307,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
           "min_included": {
             "type": "integer",
             "minimum": 1,
-            "description": "Evidence slots only, on a route with requires_evidence: assembly refuses with evidence_required when fitting leaves fewer items than this in the slot (R-12)."
+            "description": "Evidence slots only, on a route with requires_evidence: assembly refuses with evidence_required when fitting leaves fewer items than this in the slot (R-12). An item the profile places twice counts once."
           },
           "max_tokens": {
             "type": "integer",
@@ -1327,7 +1329,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
             "enum": [
               "exact"
             ],
-            "description": "exact: after conflict resolution, exclude each item whose body equals a kept item's body in this slot once whitespace runs are collapsed and the ends trimmed, with reason duplicate_content (R-24). Protected items and items a conflict group names are never excluded. Absent, the slot keeps equal bodies."
+            "description": "exact: after conflict resolution and any supersession (R-25), exclude each item whose body equals a kept item's body in this slot once whitespace runs are collapsed and the ends trimmed, with reason duplicate_content (R-24). Protected items and items a conflict group names are never excluded. Absent, the slot keeps equal bodies."
           },
           "max_per_source": {
             "type": "integer",
@@ -1342,7 +1344,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://contextwindowarchitecture.io/schema/snapshot.schema.json",
     "title": "CWA assembly snapshot",
-    "description": "Everything that can affect an assembly, frozen before assembly begins (R-23). Conformance cases use this shape so implementations in any language replay the same input. Batch items are raw producer output: admission validates each one and records an invalid item as an exclusion rather than rejecting the snapshot (R-2).",
+    "description": "Everything that can affect an assembly, frozen before assembly begins (R-23). Conformance cases use this shape so implementations in any language replay the same input. Batch items are raw producer output: admission validates each one and records an invalid item as an exclusion rather than rejecting the snapshot (R-2). An entry that is not a JSON object is not an item, and rejects the snapshot (R-17).",
     "type": "object",
     "additionalProperties": false,
     "required": [
@@ -1449,7 +1451,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
               "items": {
                 "type": "object"
               },
-              "description": "Candidate items exactly as the producer emitted them. Validated per item at admission against context_item.schema.json."
+              "description": "Candidate items exactly as the producer emitted them. Validated per item at admission against context_item.schema.json; only an entry that is not an object fails this schema (R-2, R-17)."
             },
             "excluded": {
               "$ref": "producer_batch.schema.json#/properties/excluded"
@@ -1708,13 +1710,13 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
               "type": "string",
               "minLength": 1,
               "pattern": "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]",
-              "description": "For duplicate_content only: the id of the item kept in its place (R-24)."
+              "description": "For duplicate_content only: the id of the item kept in its place, by the slot's dedupe on an assembler row (R-24) or by the producer on a producer row (R-13)."
             },
             "superseded_by": {
               "type": "string",
               "minLength": 1,
               "pattern": "[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]",
-              "description": "For superseded only: the id of the latest item kept for the same producer and source (R-25)."
+              "description": "For superseded only: on an assembler row, the id of the latest item kept for the same producer and source (R-25); on a producer row, the candidate the producer's report names (R-9)."
             },
             "slot": {
               "type": "string",
@@ -1834,7 +1836,7 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
                 "refused",
                 "moot"
               ],
-              "description": "resolved when authority or policy decided the group; surfaced, context_requested or refused when it escalated, following the route's on_unresolved action; moot when fewer than two members were admitted (R-11)."
+              "description": "resolved when authority, policy or a freshness tie-break decided the group; surfaced, context_requested or refused when it escalated, following the route's on_unresolved action; moot when fewer than two members were admitted (R-11)."
             },
             "decided_by": {
               "type": "string",
@@ -2077,7 +2079,8 @@ export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = {
             ]
           },
           "detail": {
-            "type": "string"
+            "type": "string",
+            "description": "Free text for people about the recovery. No requirement defines it, and conformance never compares it (conformance/README.md, Running a case)."
           }
         },
         "required": [
@@ -2247,7 +2250,7 @@ export const REASONS = [
     "code": "producer_slot_not_allowed",
     "kind": "exclusion",
     "rule": "R-15",
-    "text": "The authenticated producer is not permitted to emit into this slot: the route does not list the slot for it, or its kind rules the slot out whatever the route lists. State slots take only kind state (R-8), a memory producer only interaction.memory (R-14), a retrieval producer only the evidence slots (R-13), and an mcp producer only the evidence slots, plus governance.capabilities, where capability_not_allowed applies (R-15)."
+    "text": "The authenticated producer is not permitted to emit into this slot: the route does not list the slot for it, or its kind rules the slot out whatever the route lists. State slots take only kind state (R-8), a memory producer only interaction.memory (R-14), a retrieval producer only the evidence slots (R-13), and an mcp producer only the evidence slots, plus governance.capabilities when the route lists it for the producer, where capability_not_allowed applies (R-15)."
   },
   {
     "code": "authority_not_allowed",
@@ -2331,7 +2334,7 @@ export const REASONS = [
     "code": "below_threshold",
     "kind": "exclusion",
     "rule": "R-13",
-    "text": "The rerank score is under its slot's min_relevance, or the item has no score in a slot that sets one. A score equal to the threshold passes."
+    "text": "The rerank score is under its slot's min_relevance, or the item has no score in a slot that sets one. A score equal to the threshold passes. An evidence.knowledge item always needs a score, so one without it is missing_field:relevance instead (R-13)."
   },
   {
     "code": "not_eligible",

@@ -9,7 +9,7 @@ test('every published case is a valid snapshot (conformance/README.md, Snapshot 
 
 test('each rejection case breaks exactly one snapshot check or its schemas (R-17)', () => {
   const rejections = loadRejections();
-  assert.equal(rejections.length, 22);
+  assert.equal(rejections.length, 24);
   for (const r of rejections) {
     const problems = checkSnapshot(r.snapshot);
     assert.equal(problems.length, 1, `${r.id}: ${problems.join('; ')}`);

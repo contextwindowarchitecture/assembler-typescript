@@ -44,7 +44,8 @@ export interface RenderItem {
 export interface Occurrence {
   item: RenderItem;
   placement: number;
-  /** The tokens of the body as this occurrence renders it: escaped in an xml: wrap, as-is in system and tools. */
+  /** The tokens of the body as this occurrence renders it: escaped in an xml: wrap, as-is in system and tools. An
+   * xml: element's tags and a conflict mark's <conflict> wrapper count only in the payload's tokens. */
   tokens: number;
 }
 
@@ -68,11 +69,19 @@ function xmlElement(tag: string, item: RenderItem, speaker: boolean): string {
   return `<${tag}${attributes}>\n${escape(item.body)}\n</${tag}>\n`;
 }
 
+/** A cwa-messages/v1 system or tools entry. A surfaced member's mark is in its text, the only part the model
+ * receives (R-11); the body stays unescaped (R-10). */
+function messagesEntry(item: RenderItem): { id: string; text: string; conflict?: string } {
+  if (item.conflict === undefined) return { id: item.id, text: item.body };
+  return { id: item.id, text: `<conflict group="${attribute(item.conflict)}">\n${item.body}\n</conflict>`, conflict: item.conflict };
+}
+
 /** A payload's parts before counting: the texts the renderer counts, and each item occurrence in order. */
 interface Layout {
   /** The payload text: fixture-xml/v1's document, or cwa-messages/v1's RFC 8785 request. */
   text: string;
-  /** The texts the renderer's count sums: the document, or every system and tools text and the message content. */
+  /** The texts the renderer's count sums: the document, or every system and tools text, conflict mark included,
+   * and the message content. */
   counted: string[];
   occurrences: { item: RenderItem; placement: number; wrap: string }[];
 }
@@ -88,12 +97,12 @@ function layout(renderer: string, placement: Placement, items: readonly RenderIt
     return { text, counted: [text], occurrences };
   }
   if (renderer === 'cwa-messages/v1') {
-    const system: { id: string; text: string; conflict?: string }[] = [];
+    const system: ReturnType<typeof messagesEntry>[] = [];
     const tools: typeof system = [];
     let content = '';
     for (const { item, wrap } of occurrences) {
       if (wrap === 'system' || wrap === 'tools') {
-        (wrap === 'system' ? system : tools).push({ id: item.id, text: item.body, ...(item.conflict !== undefined ? { conflict: item.conflict } : {}) });
+        (wrap === 'system' ? system : tools).push(messagesEntry(item));
       } else {
         content += xmlElement(wrap.slice(4), item, true);
       }

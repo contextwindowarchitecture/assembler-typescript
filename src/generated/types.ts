@@ -60,7 +60,7 @@ export type CWAContextItem = {
   body: string;
   variants?: Variants;
   /**
-   * Finite rerank score; the scale and threshold belong to versioned route policy.
+   * Finite rerank score; the scale and threshold belong to versioned route policy. Required in evidence.knowledge (R-13).
    */
   relevance?: number;
   revoked_by?: string;
@@ -214,11 +214,11 @@ export type CWAAssemblyTrace = {
     reason: string;
     stage: "producer" | "assembler";
     /**
-     * For duplicate_content only: the id of the item kept in its place (R-24).
+     * For duplicate_content only: the id of the item kept in its place, by the slot's dedupe on an assembler row (R-24) or by the producer on a producer row (R-13).
      */
     duplicate_of?: string;
     /**
-     * For superseded only: the id of the latest item kept for the same producer and source (R-25).
+     * For superseded only: on an assembler row, the id of the latest item kept for the same producer and source (R-25); on a producer row, the candidate the producer's report names (R-9).
      */
     superseded_by?: string;
     slot?:
@@ -241,7 +241,7 @@ export type CWAAssemblyTrace = {
     items: string[];
     kind: "instruction" | "fact";
     /**
-     * resolved when authority or policy decided the group; surfaced, context_requested or refused when it escalated, following the route's on_unresolved action; moot when fewer than two members were admitted (R-11).
+     * resolved when authority, policy or a freshness tie-break decided the group; surfaced, context_requested or refused when it escalated, following the route's on_unresolved action; moot when fewer than two members were admitted (R-11).
      */
     resolution: "resolved" | "surfaced" | "context_requested" | "refused" | "moot";
     decided_by: "authority" | "policy" | "freshness" | "escalated" | "moot";
@@ -281,6 +281,9 @@ export type CWAAssemblyTrace = {
   };
   recovery?: {
     action: "retrieve_narrower" | "precompute_summary" | "request_context";
+    /**
+     * Free text for people about the recovery. No requirement defines it, and conformance never compares it (conformance/README.md, Running a case).
+     */
     detail?: string;
   };
 };
@@ -403,6 +406,8 @@ export interface CWARoutePolicy {
       | {
           kind: "policy" | "state" | "retrieval" | "memory" | "mcp" | "capability_policy" | "interaction";
           /**
+           * Slots this producer may send. An item in any other slot is excluded with producer_slot_not_allowed (R-15). The producer's kind limits its slots further, whatever this list holds (R-8, R-13, R-14, R-15).
+           *
            * @minItems 1
            */
           slots: (
@@ -455,13 +460,13 @@ export interface CWARoutePolicy {
       | undefined;
   };
   /**
-   * Tiers this route raises above the slot default. Only raising is meaningful; items cannot raise their own (R-16).
+   * Tiers this route raises above the slot default; items cannot raise their own (R-16). A value at or below the default changes nothing: the effective tier is the higher of the two.
    */
   tier_upgrades?: {
     [k: string]: "compressible" | "protected" | undefined;
   };
   /**
-   * The order in which compressible items are reduced under budget pressure, once every droppable item is gone (R-16). Item token_budget caps and slot max_tokens caps apply before it, whether or not the payload fits. Each step compresses (selects supplied variants for) or omits one slot's compressible items, lowest-ranked first, until the payload fits. Steps the route does not list follow in the default order: compress each slot, then omit each slot, both in shedding order. With no steps, variants always come before omission.
+   * The order in which compressible items are reduced: under budget pressure, once every droppable item a slot floor does not hold is gone, and, for the steps that name a slot, while that slot's max_tokens cap is enforced (R-16). Item token_budget caps apply first, whether or not the payload fits. Each step compresses (selects supplied variants for) or omits one slot's compressible items, lowest-ranked first, until the payload fits or the slot is within its cap; under budget pressure a slot floor can withhold a reduction (conformance/README.md, Fitting). Steps the route does not list follow in the default order: compress each slot, then omit each slot, both in shedding order. With no steps, variants always come before omission.
    */
   fitting_order?: {
     slot:
@@ -508,7 +513,7 @@ export interface CWARoutePolicy {
 }
 export interface SlotRules {
   /**
-   * Items scoring below this rerank threshold are excluded as below_threshold (R-13). An item with no relevance cannot clear a threshold and is excluded the same way. A score equal to the threshold passes.
+   * Items scoring below this rerank threshold are excluded as below_threshold (R-13). An item with no relevance cannot clear a threshold and is excluded the same way, except in evidence.knowledge, where relevance is required and an item without it is missing_field:relevance (R-13). A score equal to the threshold passes.
    */
   min_relevance?: number;
   /**
@@ -534,7 +539,7 @@ export interface SlotRules {
    */
   order_by?: ("-relevance" | "-freshness" | "freshness")[];
   /**
-   * Evidence slots only, on a route with requires_evidence: assembly refuses with evidence_required when fitting leaves fewer items than this in the slot (R-12).
+   * Evidence slots only, on a route with requires_evidence: assembly refuses with evidence_required when fitting leaves fewer items than this in the slot (R-12). An item the profile places twice counts once.
    */
   min_included?: number;
   /**
@@ -550,7 +555,7 @@ export interface SlotRules {
    */
   supersede?: "source";
   /**
-   * exact: after conflict resolution, exclude each item whose body equals a kept item's body in this slot once whitespace runs are collapsed and the ends trimmed, with reason duplicate_content (R-24). Protected items and items a conflict group names are never excluded. Absent, the slot keeps equal bodies.
+   * exact: after conflict resolution and any supersession (R-25), exclude each item whose body equals a kept item's body in this slot once whitespace runs are collapsed and the ends trimmed, with reason duplicate_content (R-24). Protected items and items a conflict group names are never excluded. Absent, the slot keeps equal bodies.
    */
   dedupe?: "exact";
   /**
@@ -560,7 +565,7 @@ export interface SlotRules {
 }
 export interface SlotRules1 {
   /**
-   * Items scoring below this rerank threshold are excluded as below_threshold (R-13). An item with no relevance cannot clear a threshold and is excluded the same way. A score equal to the threshold passes.
+   * Items scoring below this rerank threshold are excluded as below_threshold (R-13). An item with no relevance cannot clear a threshold and is excluded the same way, except in evidence.knowledge, where relevance is required and an item without it is missing_field:relevance (R-13). A score equal to the threshold passes.
    */
   min_relevance?: number;
   /**
@@ -586,7 +591,7 @@ export interface SlotRules1 {
    */
   order_by?: ("-relevance" | "-freshness" | "freshness")[];
   /**
-   * Evidence slots only, on a route with requires_evidence: assembly refuses with evidence_required when fitting leaves fewer items than this in the slot (R-12).
+   * Evidence slots only, on a route with requires_evidence: assembly refuses with evidence_required when fitting leaves fewer items than this in the slot (R-12). An item the profile places twice counts once.
    */
   min_included?: number;
   /**
@@ -602,7 +607,7 @@ export interface SlotRules1 {
    */
   supersede?: "source";
   /**
-   * exact: after conflict resolution, exclude each item whose body equals a kept item's body in this slot once whitespace runs are collapsed and the ends trimmed, with reason duplicate_content (R-24). Protected items and items a conflict group names are never excluded. Absent, the slot keeps equal bodies.
+   * exact: after conflict resolution and any supersession (R-25), exclude each item whose body equals a kept item's body in this slot once whitespace runs are collapsed and the ends trimmed, with reason duplicate_content (R-24). Protected items and items a conflict group names are never excluded. Absent, the slot keeps equal bodies.
    */
   dedupe?: "exact";
   /**
@@ -611,7 +616,7 @@ export interface SlotRules1 {
   max_per_source?: number;
 }
 /**
- * Everything that can affect an assembly, frozen before assembly begins (R-23). Conformance cases use this shape so implementations in any language replay the same input. Batch items are raw producer output: admission validates each one and records an invalid item as an exclusion rather than rejecting the snapshot (R-2).
+ * Everything that can affect an assembly, frozen before assembly begins (R-23). Conformance cases use this shape so implementations in any language replay the same input. Batch items are raw producer output: admission validates each one and records an invalid item as an exclusion rather than rejecting the snapshot (R-2). An entry that is not a JSON object is not an item, and rejects the snapshot (R-17).
  */
 export interface CWAAssemblySnapshot {
   assembly_time: string;
@@ -637,7 +642,7 @@ export interface CWAAssemblySnapshot {
       kind: "policy" | "state" | "retrieval" | "memory" | "mcp" | "capability_policy" | "interaction";
     };
     /**
-     * Candidate items exactly as the producer emitted them. Validated per item at admission against context_item.schema.json.
+     * Candidate items exactly as the producer emitted them. Validated per item at admission against context_item.schema.json; only an entry that is not an object fails this schema (R-2, R-17).
      */
     items: {}[];
     excluded: Excluded;
