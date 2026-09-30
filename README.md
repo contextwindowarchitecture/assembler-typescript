@@ -23,6 +23,7 @@ const { payload, trace } = assemble(snapshot);
 
 - A snapshot that fails its schemas or the snapshot checks throws `SnapshotRejectedError`, with its `problems` in words. There is no payload and no trace (R-17). `checkSnapshot(snapshot)` returns the same problems without assembling.
 - A snapshot that names a tokenizer or renderer this package does not provide throws `UnsupportedComponentError`. The package provides the tokenizers `fixture-whitespace/v1` and `estimate-utf8/v1` and the renderers `fixture-xml/v1` and `cwa-messages/v1`. Pass your model's tokenizer as `options.tokenizers`, keyed by the ID your snapshots name.
+- That ID must be one no published tokenizer uses, so that a trace naming a published tokenizer always means its published count (R-16). When `options.tokenizers` names a tokenizer `conformance/README.md` publishes, today `fixture-whitespace/v1` or `estimate-utf8/v1`, `assemble()` throws `PublishedTokenizerIdError` with those IDs in `ids`, even when the snapshot names another tokenizer. It stops before assembly, and before it checks the snapshot: there is no payload and no trace.
 - `options.traceId` sets the trace id, which is otherwise a random UUID. `trace.timings` records each stage's duration in milliseconds. Both may differ between runs of the same snapshot (R-23); everything else, the payload bytes included, is deterministic.
 
 ## Requirements

@@ -4,18 +4,21 @@ import { performance } from 'node:perf_hooks';
 import { admit, type AdmittedItem } from './admission.js';
 import { resolveConflicts } from './conflicts.js';
 import { snapshotDigest } from './digest.js';
-import { SnapshotRejectedError, UnsupportedComponentError } from './errors.js';
+import { PublishedTokenizerIdError, SnapshotRejectedError, UnsupportedComponentError } from './errors.js';
 import { fit, type Fitted } from './fitting.js';
 import { capSources, dedupe, supersede } from './pruning.js';
 import { RENDERERS, renderedBody, sha256 } from './renderers.js';
 import { checkSnapshot } from './snapshot-checks.js';
-import { TOKENIZERS, type Tokenizer } from './tokenizers.js';
+import { PUBLISHED_TOKENIZERS, TOKENIZERS, type Tokenizer } from './tokenizers.js';
 import type { CompressedRow, ExcludedRow, IncludedRow, Recovery, Snapshot, Trace } from './types.js';
 
 export interface AssembleOptions {
   /** The trace's id. Defaults to a random UUID; trace ids may differ between runs (R-23). */
   traceId?: string;
-  /** Tokenizers to provide beside the published ones, keyed by the ID a snapshot names. */
+  /**
+   * Tokenizers to provide beside the published ones, keyed by the ID a snapshot names. No key may be the ID of a
+   * published tokenizer, even one the snapshot does not name: assemble() throws PublishedTokenizerIdError (R-16).
+   */
   tokenizers?: Readonly<Record<string, Tokenizer>>;
 }
 
@@ -31,14 +34,21 @@ type Refusal = 'required_slot_missing' | 'protected_slot_unplaced' | 'conflict_u
 const EVIDENCE = ['evidence.knowledge', 'evidence.tool_results'] as const;
 
 /**
- * Assembles a snapshot. Throws SnapshotRejectedError when it fails its schemas or the snapshot checks (no payload,
- * no trace), and UnsupportedComponentError when it names a tokenizer or renderer this implementation lacks.
+ * Assembles a snapshot. Throws PublishedTokenizerIdError, before it checks the snapshot, when options.tokenizers
+ * names a published tokenizer's ID (R-16); SnapshotRejectedError when the snapshot fails its schemas or the snapshot
+ * checks (R-17); and UnsupportedComponentError when it names a tokenizer or renderer this implementation lacks.
+ * None of them has a payload or a trace.
  */
 export function assemble(value: unknown, options: AssembleOptions = {}): Assembly {
+  // R-16: a trace that names a published tokenizer always means its published count, so the caller may not supply
+  // one under a published ID, whether or not this snapshot names it.
+  const supplied = options.tokenizers ?? {};
+  const published = PUBLISHED_TOKENIZERS.filter(id => Object.hasOwn(supplied, id));
+  if (published.length > 0) throw new PublishedTokenizerIdError(published);
   const problems = checkSnapshot(value);
   if (problems.length > 0) throw new SnapshotRejectedError(problems);
   const snapshot = value as Snapshot;
-  const count = options.tokenizers?.[snapshot.tokenizer] ?? TOKENIZERS[snapshot.tokenizer];
+  const count = TOKENIZERS[snapshot.tokenizer] ?? options.tokenizers?.[snapshot.tokenizer];
   if (!count) throw new UnsupportedComponentError('tokenizer', snapshot.tokenizer);
   if (!RENDERERS.includes(snapshot.renderer)) throw new UnsupportedComponentError('renderer', snapshot.renderer);
 

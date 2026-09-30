@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assemble, checkSnapshot, SnapshotRejectedError, UnsupportedComponentError } from '../src/index.js';
+import { assemble, checkSnapshot, PublishedTokenizerIdError, SnapshotRejectedError, UnsupportedComponentError } from '../src/index.js';
 import type { Snapshot } from '../src/index.js';
 import { loadCases, loadRejections } from './cases.js';
 
@@ -31,6 +31,28 @@ test('a caller may provide a tokenizer by the id its snapshots name', () => {
   const { trace } = assemble(snapshot, { tokenizers: { 'characters/v1': text => text.length } });
   assert.equal(trace.context.tokenizer, 'characters/v1');
   assert.equal(trace.result?.input_tokens, Buffer.from(assemble(fixture()).payload!).toString('utf8').length);
+});
+
+test('a caller tokenizer under a published ID stops before assembly, with no payload and no trace (R-16)', () => {
+  // conformance/README.md, Tokenizers and renderers: a trace that names a published tokenizer always means its
+  // published count, so options.tokenizers may name no published ID, whether or not the snapshot uses it.
+  // fixture-three-slot names fixture-whitespace/v1 and not estimate-utf8/v1.
+  let calls = 0;
+  const own = (text: string) => { calls += 1; return text.length; };
+  const rejected = loadRejections().find(r => r.id === 'profile-route-policy-mismatch')!.snapshot;
+  const stops = (snapshot: unknown, tokenizers: Record<string, typeof own>, ids: string[]) =>
+    assert.throws(() => assemble(snapshot, { tokenizers }), (error: unknown) => {
+      assert.ok(error instanceof PublishedTokenizerIdError);
+      assert.deepEqual(error.ids, ids);
+      return true;
+    });
+  for (const id of ['fixture-whitespace/v1', 'estimate-utf8/v1']) {
+    stops(fixture(), { [id]: own }, [id]);
+    stops(fixture(), { 'characters/v1': own, [id]: own }, [id]);
+    stops(rejected, { [id]: own }, [id]); // the options are checked before the snapshot
+  }
+  stops(fixture(), { 'estimate-utf8/v1': own, 'fixture-whitespace/v1': own }, ['fixture-whitespace/v1', 'estimate-utf8/v1']);
+  assert.equal(calls, 0);
 });
 
 test('the payload and trace are deterministic, apart from the trace id and timings (R-23)', () => {

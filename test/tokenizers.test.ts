@@ -1,6 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TOKENIZERS } from '../src/tokenizers.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { RENDERERS } from '../src/renderers.js';
+import { PUBLISHED_TOKENIZERS, TOKENIZERS } from '../src/tokenizers.js';
+import { CONFORMANCE } from './cases.js';
+
+test('the published tokenizers are the ones conformance/README.md lists', () => {
+  // Tokenizers and renderers lists one bullet per published component: a tokenizer's bullet says it "counts" a text,
+  // and every other bullet is a renderer's. A re-vendor that publishes a tokenizer fails here until
+  // PUBLISHED_TOKENIZERS names it.
+  const readme = readFileSync(join(CONFORMANCE, 'README.md'), 'utf8');
+  const section = readme.split(/^## /m).find(part => part.startsWith('Tokenizers and renderers\n'))!;
+  const bullets = [...section.matchAll(/^- `([^`]+)` (\w+) /gm)].map(([, id, verb]) => ({ id: id!, verb: verb! }));
+  assert.deepEqual(bullets.filter(b => b.verb === 'counts').map(b => b.id), PUBLISHED_TOKENIZERS);
+  assert.deepEqual(bullets.filter(b => b.verb !== 'counts').map(b => b.id), RENDERERS);
+});
 
 test('fixture-whitespace/v1 counts runs outside the ECMAScript whitespace set', () => {
   const count = TOKENIZERS['fixture-whitespace/v1']!;
