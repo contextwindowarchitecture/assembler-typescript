@@ -8,6 +8,22 @@ const snapshot = (id: string): Snapshot => structuredClone(loadCases().find(c =>
 const rows = (s: Snapshot) => admit(s).rows.map(r => [r.item_id, r.reason]);
 const admitted = (s: Snapshot) => admit(s).admitted.map(a => a.item.id);
 
+test('a producer ID only Object.prototype has is unlisted unless the route lists it as its own key (R-15)', () => {
+  // fixture-three-slot's policy-corpus batch carries one candidate, refunds-eu:v17#p4.
+  const renamed = (id: string): Snapshot => {
+    const s = snapshot('fixture-three-slot');
+    s.batches.find(b => b.producer.id === 'policy-corpus')!.producer.id = id;
+    return s;
+  };
+  for (const id of ['unlisted', 'toString', 'constructor', '__proto__', 'hasOwnProperty', 'valueOf']) {
+    assert.deepEqual(rows(renamed(id)), [['refunds-eu:v17#p4', 'producer_not_authenticated']], id);
+  }
+  const listed = renamed('toString');
+  listed.route_policy.producers['toString'] = listed.route_policy.producers['policy-corpus']!;
+  assert.deepEqual(rows(listed), []);
+  assert.ok(admitted(listed).includes('refunds-eu:v17#p4'));
+});
+
 test("a capability is admitted only from the grant's producer when the route lists it with kind capability_policy (R-15)", () => {
   // The grant names tool-registry and allows the tool, but the route lists that producer with kind policy.
   const policy = snapshot('capability-policy-kind');

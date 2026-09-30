@@ -48,7 +48,10 @@ export function assemble(value: unknown, options: AssembleOptions = {}): Assembl
   const problems = checkSnapshot(value);
   if (problems.length > 0) throw new SnapshotRejectedError(problems);
   const snapshot = value as Snapshot;
-  const count = TOKENIZERS[snapshot.tokenizer] ?? options.tokenizers?.[snapshot.tokenizer];
+  // A snapshot may name any ID, toString and __proto__ included, so a tokenizer is found only as an own key of the
+  // published table or of the caller's, never on either object's prototype.
+  const count = Object.hasOwn(TOKENIZERS, snapshot.tokenizer) ? TOKENIZERS[snapshot.tokenizer]
+    : Object.hasOwn(supplied, snapshot.tokenizer) ? supplied[snapshot.tokenizer] : undefined;
   if (!count) throw new UnsupportedComponentError('tokenizer', snapshot.tokenizer);
   if (!RENDERERS.includes(snapshot.renderer)) throw new UnsupportedComponentError('renderer', snapshot.renderer);
 

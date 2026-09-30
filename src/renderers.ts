@@ -25,8 +25,10 @@ const REALIZE: Record<string, (placement: Placement) => string[]> = {
   },
 };
 
-/** Why a renderer cannot realize a profile's placement; empty when it can, or when the renderer is unknown. */
-export const realizationProblems = (renderer: string, placement: Placement): string[] => REALIZE[renderer]?.(placement) ?? [];
+/** Why a renderer cannot realize a profile's placement; empty when it can, or when the renderer is unknown. A renderer
+ * is known only as an own key of REALIZE, so an ID such as toString or __proto__ is unknown. */
+export const realizationProblems = (renderer: string, placement: Placement): string[] =>
+  Object.hasOwn(REALIZE, renderer) ? REALIZE[renderer]!(placement) : [];
 
 export const RENDERERS = Object.keys(REALIZE);
 

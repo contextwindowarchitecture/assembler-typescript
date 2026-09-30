@@ -25,6 +25,41 @@ test('an unknown tokenizer or renderer throws UnsupportedComponentError naming i
   }
 });
 
+// IDs the schemas allow that only Object.prototype has: an ID is provided only as a lookup table's own key.
+const PROTOTYPE_KEYS = ['toString', 'constructor', '__proto__', 'hasOwnProperty', 'valueOf'];
+const unsupported = (component: 'tokenizer' | 'renderer', id: string) => (error: unknown) =>
+  error instanceof UnsupportedComponentError && error.component === component && error.id === id;
+
+test('a tokenizer ID only Object.prototype has is not provided', () => {
+  for (const id of PROTOTYPE_KEYS) {
+    const snapshot = fixture();
+    snapshot.tokenizer = id;
+    assert.throws(() => assemble(snapshot), unsupported('tokenizer', id), id);
+  }
+});
+
+test("a caller's tokenizer is found by its own key only", () => {
+  for (const id of PROTOTYPE_KEYS) {
+    const snapshot = fixture();
+    snapshot.tokenizer = id;
+    assert.throws(() => assemble(snapshot, { tokenizers: { 'characters/v1': text => text.length } }), unsupported('tokenizer', id), id);
+  }
+  // A caller may still key its own tokenizer toString.
+  const snapshot = fixture();
+  snapshot.tokenizer = 'toString';
+  const { trace } = assemble(snapshot, { tokenizers: { toString: (text: string) => text.length } });
+  assert.equal(trace.result?.input_tokens, Buffer.from(assemble(fixture()).payload!).toString('utf8').length);
+});
+
+test('a renderer ID only Object.prototype has is not provided, and not a problem with the snapshot', () => {
+  for (const id of PROTOTYPE_KEYS) {
+    const snapshot = fixture();
+    snapshot.renderer = id;
+    assert.deepEqual(checkSnapshot(snapshot), [], id);
+    assert.throws(() => assemble(snapshot), unsupported('renderer', id), id);
+  }
+});
+
 test('a caller may provide a tokenizer by the id its snapshots name', () => {
   const snapshot = fixture();
   snapshot.tokenizer = 'characters/v1';

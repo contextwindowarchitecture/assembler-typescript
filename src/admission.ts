@@ -66,7 +66,8 @@ export function admit(snapshot: Snapshot): Admission {
   const defaultsFilled: DefaultFilledRow[] = [];
   for (const batch of snapshot.batches) {
     const producer = batch.producer;
-    const route = policy.producers[producer.id];
+    // The route lists a producer only as an own key: an id such as toString or __proto__ is otherwise unlisted.
+    const route = Object.hasOwn(policy.producers, producer.id) ? policy.producers[producer.id] : undefined;
     const authenticated = route !== undefined && route.kind === producer.kind;
     let invalid = 0;
     for (const raw of batch.items) {
