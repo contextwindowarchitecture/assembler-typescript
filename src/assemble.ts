@@ -20,6 +20,8 @@ export interface AssembleOptions {
    * published tokenizer, even one the snapshot does not name: assemble() throws PublishedTokenizerIdError (R-16).
    */
   tokenizers?: Readonly<Record<string, Tokenizer>>;
+  // No renderers option: the package takes no renderer of the application's own, so R-16's rule against one under a
+  // published ID holds with nothing to check, and assemble() renders only with one of RENDERERS.
 }
 
 export interface Assembly {
