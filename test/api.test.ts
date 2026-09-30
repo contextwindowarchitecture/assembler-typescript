@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assemble, checkSnapshot, PublishedTokenizerIdError, SnapshotRejectedError, UnsupportedComponentError } from '../src/index.js';
-import type { Snapshot } from '../src/index.js';
+import { assemble, checkSnapshot, PublishedTokenizerIdError, RENDERERS, SnapshotRejectedError, TOKENIZERS,
+  UnsupportedComponentError } from '../src/index.js';
+import type { Snapshot, Tokenizer } from '../src/index.js';
 import { loadCases, loadRejections } from './cases.js';
 
 const fixture = (): Snapshot => structuredClone(loadCases().find(c => c.id === 'fixture-three-slot')!.snapshot) as Snapshot;
@@ -88,6 +89,48 @@ test('a caller tokenizer under a published ID stops before assembly, with no pay
   }
   stops(fixture(), { 'estimate-utf8/v1': own, 'fixture-whitespace/v1': own }, ['fixture-whitespace/v1', 'estimate-utf8/v1']);
   assert.equal(calls, 0);
+});
+
+test('an application cannot replace a published tokenizer through the exported TOKENIZERS (R-16)', () => {
+  // A trace that names a published tokenizer always means its published count, so the table the package exports is
+  // frozen: assigning, adding or deleting a key throws, and assembly still counts with the published tokenizer.
+  const table = TOKENIZERS as Record<string, Tokenizer>;
+  const published = table['fixture-whitespace/v1']!;
+  const expected = assemble(fixture()).trace.result?.input_tokens;
+  let calls = 0;
+  const own = (text: string) => { calls += 1; return text.length; };
+  try {
+    assert.ok(Object.isFrozen(TOKENIZERS));
+    assert.throws(() => { table['fixture-whitespace/v1'] = own; }, TypeError);
+    assert.throws(() => { table['characters/v1'] = own; }, TypeError);
+    assert.throws(() => { delete table['estimate-utf8/v1']; }, TypeError);
+    assert.deepEqual(Object.keys(TOKENIZERS), ['fixture-whitespace/v1', 'estimate-utf8/v1']);
+    const { trace } = assemble(fixture());
+    assert.equal(trace.context.tokenizer, 'fixture-whitespace/v1');
+    assert.equal(trace.result?.input_tokens, expected);
+    assert.equal(calls, 0);
+  } finally {
+    if (!Object.isFrozen(TOKENIZERS)) Object.assign(table, { 'fixture-whitespace/v1': published });
+  }
+});
+
+test('an application cannot change the exported RENDERERS', () => {
+  // The package takes no renderer of the application's own (R-16), and RENDERERS lists the ones it has, so a caller
+  // cannot add an ID it would accept and then fail to render, or remove a published one.
+  const list = RENDERERS as string[];
+  const original = [...RENDERERS];
+  try {
+    assert.ok(Object.isFrozen(RENDERERS));
+    assert.throws(() => list.push('some-renderer/v1'), TypeError);
+    assert.throws(() => { list[0] = 'some-renderer/v1'; }, TypeError);
+    assert.throws(() => { list.length = 0; }, TypeError);
+    assert.deepEqual(RENDERERS, ['fixture-xml/v1', 'cwa-messages/v1']);
+    const snapshot = fixture();
+    snapshot.renderer = 'some-renderer/v1';
+    assert.throws(() => assemble(snapshot), unsupported('renderer', 'some-renderer/v1'));
+  } finally {
+    if (!Object.isFrozen(RENDERERS)) list.splice(0, list.length, ...original);
+  }
 });
 
 test('the payload and trace are deterministic, apart from the trace id and timings (R-23)', () => {

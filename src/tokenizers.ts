@@ -12,9 +12,13 @@ export type Tokenizer = (text: string) => number;
  */
 export const PUBLISHED_TOKENIZERS: readonly string[] = ['fixture-whitespace/v1', 'estimate-utf8/v1'];
 
-export const TOKENIZERS: Readonly<Record<string, Tokenizer>> = {
+/**
+ * The tokenizers this package provides. The table is frozen, not just typed read-only: a caller that assigned a key
+ * could replace a published tokenizer, and a trace naming it would no longer mean its published count (R-16).
+ */
+export const TOKENIZERS: Readonly<Record<string, Tokenizer>> = Object.freeze({
   /** Maximal runs outside the ECMAScript whitespace set: a test fixture, not a model tokenizer. */
   'fixture-whitespace/v1': text => text.match(NON_WHITESPACE_RUN)?.length ?? 0,
   /** UTF-8 bytes divided by 4, rounded up: a portable estimate, meant for use with budget.margin_percent. */
   'estimate-utf8/v1': text => Math.floor((Buffer.byteLength(text, 'utf8') + 3) / 4),
-};
+});

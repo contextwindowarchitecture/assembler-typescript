@@ -30,7 +30,9 @@ const REALIZE: Record<string, (placement: Placement) => string[]> = {
 export const realizationProblems = (renderer: string, placement: Placement): string[] =>
   Object.hasOwn(REALIZE, renderer) ? REALIZE[renderer]!(placement) : [];
 
-export const RENDERERS = Object.keys(REALIZE);
+/** The renderers this package provides, the only ones it renders with: it takes none of the application's own
+ * (R-16). The list is frozen, so a caller cannot add an ID assemble() would accept and fail to render. */
+export const RENDERERS: readonly string[] = Object.freeze(Object.keys(REALIZE));
 
 /** An item as the renderer sees it: the body is its current one, a variant once fitting has compressed it. */
 export interface RenderItem {
