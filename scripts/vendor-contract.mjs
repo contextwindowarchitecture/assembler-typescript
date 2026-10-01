@@ -34,6 +34,8 @@ for (const source of SOURCES) {
   }
 }
 const sorted = Object.fromEntries(Object.entries(files).sort(([a], [b]) => (a < b ? -1 : 1)));
-const lock = { website_commit: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain') !== '', files: sorted };
+// Dirty means a tracked file differs from the commit. Untracked files (an editor's or a tool's directory
+// beside the contract) are not part of what the commit publishes, so they leave the flag alone.
+const lock = { website_commit: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain', '--untracked-files=no') !== '', files: sorted };
 writeFileSync(LOCK, JSON.stringify(lock, null, 2) + '\n');
 console.log(`vendored ${Object.keys(sorted).length} files from ${lock.website_commit}${lock.dirty ? ' (dirty)' : ''}`);
