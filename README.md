@@ -60,6 +60,8 @@ This runs every vendored case and rejection snapshot as `conformance/README.md` 
 
 `pnpm publish` publishes with public access (`publishConfig`). `prepublishOnly` runs the tests and a fresh build first, so a failing or stale `dist/` is never published. The tarball holds `dist/`, `LICENSE`, `NOTICE`, `README.md` and `package.json`.
 
+Each tag gets a GitHub release once CI passes on the tagged commit (`.github/workflows/release.yml`); it publishes nothing to npm. Its notes name the website commit `vendor/cwa.lock.json` pins and list the tag's own commits, written by git-cliff (`cliff.toml`). A tag that is not `vX.Y.Z` is a prerelease, and a tag pushed before the workflow existed is released with `gh workflow run release.yml -f tag=<tag>`.
+
 See [AGENTS.md](AGENTS.md) for the working rules.
 
 ## License
