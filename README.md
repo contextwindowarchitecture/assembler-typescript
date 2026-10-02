@@ -38,7 +38,7 @@ pnpm run build
 pnpm test
 ```
 
-pnpm is the package manager. `packageManager` in `package.json` pins its version, which pnpm switches to by itself, and `pnpm-lock.yaml` pins every dependency.
+pnpm is the package manager. `packageManager` in `package.json` pins its version, which pnpm switches to by itself, and `pnpm-lock.yaml` pins every dependency. CI (`.github/workflows/ci.yml`) runs `pnpm install --frozen-lockfile` and `pnpm test` on Node 22 and 24.
 
 ## Cost
 
