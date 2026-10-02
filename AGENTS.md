@@ -1,4 +1,4 @@
-# Working in cwa-assembler-ts
+# Working in assembler-typescript
 
 A TypeScript implementation of the CWA draft specification (M13 of the CWA plan). Its target is every conformance case: each case's payload byte for byte and its trace, plus every rejection case rejected. `conformance-report.json` records the result.
 
@@ -13,7 +13,7 @@ A TypeScript implementation of the CWA draft specification (M13 of the CWA plan)
 
 ## Working from the spec
 
-- Work from the published spec only: the contract vendored in `vendor/cwa/`. Don't read the reference assembler (`../cwa-assembler`).
+- Work from the published spec only: the contract vendored in `vendor/cwa/`. Don't read the reference assembler (`../assembler-python`).
 - Where the spec leaves a behavior open, don't decide it here. Ask the maintainer, fix the spec in the website repo first (with its tests, committed on its `assembler-v0.0.2` branch), re-vendor, then implement.
 - `vendor/cwa.lock.json` pins every vendored file by SHA-256, like a lockfile, with the website commit it came from and whether that checkout was dirty. Change vendored files only with `pnpm run vendor <website checkout>`. The tests fail when a vendored file no longer matches its hash, or when a file is added or missing.
 - `src/generated/` is generated from the vendored contract by `pnpm run generate`: `types.ts` holds the TypeScript types json-schema-to-typescript derives from the published schemas, and `contract.ts` embeds the schemas, reasons and slot defaults. Don't edit either by hand; the tests fail when they are stale. Run `pnpm run generate` after every re-vendor.
