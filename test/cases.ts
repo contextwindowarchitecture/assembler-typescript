@@ -5,9 +5,8 @@ import { ROOT } from './root.js';
 export const CONFORMANCE = join(ROOT, 'vendor', 'cwa', 'conformance');
 
 /** Cases and rejection snapshots this implementation does not pass yet. The list only shrinks; it is empty when M13
- * is done. The blocks ones use cwa-message-blocks/v1, an optional renderer this package does not provide yet, so the
- * conformance runner skips them (Reporting results). */
-export const PENDING = new Set<string>(['blocks-budget', 'blocks-render', 'blocks-system-after-xml']);
+ * is done. */
+export const PENDING = new Set<string>([]);
 
 export interface Case {
   id: string;

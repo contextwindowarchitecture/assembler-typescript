@@ -124,7 +124,7 @@ test('an application cannot change the exported RENDERERS', () => {
     assert.throws(() => list.push('some-renderer/v1'), TypeError);
     assert.throws(() => { list[0] = 'some-renderer/v1'; }, TypeError);
     assert.throws(() => { list.length = 0; }, TypeError);
-    assert.deepEqual(RENDERERS, ['fixture-xml/v1', 'cwa-messages/v1']);
+    assert.deepEqual(RENDERERS, ['fixture-xml/v1', 'cwa-messages/v1', 'cwa-message-blocks/v1']);
     const snapshot = fixture();
     snapshot.renderer = 'some-renderer/v1';
     assert.throws(() => assemble(snapshot), unsupported('renderer', 'some-renderer/v1'));

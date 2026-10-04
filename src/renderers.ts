@@ -9,21 +9,26 @@ import type { Profile, Slot } from './types.js';
 type Placement = Profile['placement'];
 const XML_WRAP = /^xml:[A-Za-z_][A-Za-z0-9_.-]*$/;
 
+/** Why a message request cannot realize a placement: platform roles stay with governance slots (R-7), and the system
+ * text comes first. cwa-messages/v1 and cwa-message-blocks/v1 realize exactly the same profiles. */
+function messageProblems(placement: Placement): string[] {
+  let seenXml = false;
+  return placement.flatMap(({ slot, wrap }, i) => {
+    const problems: string[] = [];
+    if (wrap !== 'system' && wrap !== 'tools' && !XML_WRAP.test(wrap)) problems.push(`placement[${i}] wraps ${wrap}, which is not system, tools or xml:<tag>`);
+    else if (wrap === 'system' && !slot.startsWith('governance.')) problems.push(`placement[${i}] puts ${slot} in system`);
+    else if (wrap === 'tools' && slot !== 'governance.capabilities') problems.push(`placement[${i}] puts ${slot} in tools`);
+    else if (wrap === 'system' && seenXml) problems.push(`placement[${i}] puts system after an xml: placement`);
+    seenXml ||= wrap.startsWith('xml:');
+    return problems;
+  });
+}
+
 const REALIZE: Record<string, (placement: Placement) => string[]> = {
   'fixture-xml/v1': placement => placement.flatMap(({ wrap }, i) =>
     XML_WRAP.test(wrap) ? [] : [`placement[${i}] wraps ${wrap}, which is not an xml:<tag> wrap`]),
-  'cwa-messages/v1': placement => {
-    let seenXml = false;
-    return placement.flatMap(({ slot, wrap }, i) => {
-      const problems: string[] = [];
-      if (wrap !== 'system' && wrap !== 'tools' && !XML_WRAP.test(wrap)) problems.push(`placement[${i}] wraps ${wrap}, which is not system, tools or xml:<tag>`);
-      else if (wrap === 'system' && !slot.startsWith('governance.')) problems.push(`placement[${i}] puts ${slot} in system`);
-      else if (wrap === 'tools' && slot !== 'governance.capabilities') problems.push(`placement[${i}] puts ${slot} in tools`);
-      else if (wrap === 'system' && seenXml) problems.push(`placement[${i}] puts system after an xml: placement`);
-      seenXml ||= wrap.startsWith('xml:');
-      return problems;
-    });
-  },
+  'cwa-messages/v1': messageProblems,
+  'cwa-message-blocks/v1': messageProblems,
 };
 
 /** Why a renderer cannot realize a profile's placement; empty when it can, or when the renderer is unknown. A renderer
@@ -89,19 +94,35 @@ function xmlElement(tag: string, item: RenderItem, speaker: boolean): string {
   return `<${tag}${attributes}>\n${escape(item.body)}\n</${tag}>\n`;
 }
 
+/** An entry of a message request: a system or tools entry, or a cwa-message-blocks/v1 content entry. */
+interface Entry {
+  id: string;
+  text: string;
+  /** The surfaced conflict group whose member the entry's item is (R-11). */
+  conflict?: string;
+}
+
 /** A cwa-messages/v1 system or tools entry. A surfaced member's mark is in its text, the only part the model
  * receives (R-11); the body stays unescaped (R-10). */
-function messagesEntry(item: RenderItem): { id: string; text: string; conflict?: string } {
+function messagesEntry(item: RenderItem): Entry {
   if (item.conflict === undefined) return { id: item.id, text: item.body };
   return { id: item.id, text: `<conflict group="${attribute(item.conflict)}">\n${item.body}\n</conflict>`, conflict: item.conflict };
 }
 
+/** A cwa-message-blocks/v1 content entry: an xml: occurrence exactly as cwa-messages/v1 writes it into its content.
+ * A surfaced member's mark stays in the text, its conflict attribute, and the entry names the group as a system
+ * entry does (R-11). */
+function blockEntry(tag: string, item: RenderItem): Entry {
+  const text = xmlElement(tag, item, true);
+  return item.conflict === undefined ? { id: item.id, text } : { id: item.id, text, conflict: item.conflict };
+}
+
 /** A payload's parts before counting: the texts the renderer counts, and each item occurrence in order. */
 interface Layout {
-  /** The payload text: fixture-xml/v1's document, or cwa-messages/v1's RFC 8785 request. */
+  /** The payload text: fixture-xml/v1's document, or a message renderer's RFC 8785 request. */
   text: string;
-  /** The texts the renderer's count sums: the document, or every system and tools text, conflict mark included,
-   * and the message content. */
+  /** The texts the renderer's count sums: fixture-xml/v1's document; every system and tools text, conflict mark
+   * included, and cwa-messages/v1's message content or each of cwa-message-blocks/v1's content entries. */
   counted: string[];
   occurrences: { item: RenderItem; placement: number; wrap: string }[];
 }
@@ -125,19 +146,23 @@ function layout(renderer: string, placement: Placement, items: readonly RenderIt
     const text = occurrences.map(({ item, wrap }) => xmlElement(wrap.slice(4), item, false)).join('');
     return { text, counted: [text], occurrences };
   }
-  if (renderer === 'cwa-messages/v1') {
-    const system: ReturnType<typeof messagesEntry>[] = [];
-    const tools: typeof system = [];
-    let content = '';
+  if (renderer === 'cwa-messages/v1' || renderer === 'cwa-message-blocks/v1') {
+    const system: Entry[] = [];
+    const tools: Entry[] = [];
+    const blocks: Entry[] = [];
     for (const { item, wrap } of occurrences) {
-      if (wrap === 'system' || wrap === 'tools') {
-        (wrap === 'system' ? system : tools).push(messagesEntry(item));
-      } else {
-        content += xmlElement(wrap.slice(4), item, true);
-      }
+      if (wrap === 'system' || wrap === 'tools') (wrap === 'system' ? system : tools).push(messagesEntry(item));
+      else blocks.push(blockEntry(wrap.slice(4), item));
     }
-    const text = canonicalize({ system, tools, messages: [{ role: 'user', content }] });
-    return { text, counted: [...system.map(e => e.text), ...tools.map(e => e.text), content], occurrences };
+    const roles = [...system, ...tools].map(e => e.text);
+    if (renderer === 'cwa-messages/v1') {
+      // One text holds every xml: occurrence: the blocks' texts joined in order.
+      const content = blocks.map(e => e.text).join('');
+      return { text: canonicalize({ system, tools, messages: [{ role: 'user', content }] }), counted: [...roles, content], occurrences };
+    }
+    // One entry per xml: occurrence, each counted on its own, as system and tools entries are.
+    return { text: canonicalize({ system, tools, messages: [{ role: 'user', content: blocks }] }),
+      counted: [...roles, ...blocks.map(e => e.text)], occurrences };
   }
   throw new Error(`renderer ${renderer} is not provided`);
 }
