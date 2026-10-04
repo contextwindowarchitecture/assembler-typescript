@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkSnapshot } from '../src/snapshot-checks.js';
-import { loadCases, loadRejections } from './cases.js';
+import { loadCases, loadRejections, PENDING } from './cases.js';
 
 test('every published case is a valid snapshot (conformance/README.md, Snapshot checks)', () => {
   for (const c of loadCases()) assert.deepEqual(checkSnapshot(c.snapshot), [], c.id);
@@ -9,8 +9,9 @@ test('every published case is a valid snapshot (conformance/README.md, Snapshot 
 
 test('each rejection case breaks exactly one snapshot check or its schemas (R-17)', () => {
   const rejections = loadRejections();
-  assert.equal(rejections.length, 24);
-  for (const r of rejections) {
+  assert.equal(rejections.length, 25);
+  // A pending one breaks the check of a renderer this package does not provide yet, which it cannot run.
+  for (const r of rejections.filter(r => !PENDING.has(r.id))) {
     const problems = checkSnapshot(r.snapshot);
     assert.equal(problems.length, 1, `${r.id}: ${problems.join('; ')}`);
   }

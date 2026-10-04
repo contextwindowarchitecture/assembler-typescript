@@ -21,7 +21,8 @@ export interface AssembleOptions {
    */
   tokenizers?: Readonly<Record<string, Tokenizer>>;
   // No renderers option: the package takes no renderer of the application's own, so R-16's rule against one under a
-  // published ID holds with nothing to check, and assemble() renders only with one of RENDERERS.
+  // published ID, an optional one included, holds with nothing to check, and assemble() renders only with one of
+  // RENDERERS, every one of them published.
 }
 
 export interface Assembly {

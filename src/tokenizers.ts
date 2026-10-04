@@ -6,13 +6,17 @@ import { NON_WHITESPACE_RUN } from './strings.js';
 export type Tokenizer = (text: string) => number;
 
 /**
- * The IDs of the tokenizers conformance/README.md publishes, in its order, whether or not this package provides
- * them. A trace that names one always means its published count, so assemble() stops before assembly when the
- * caller's options.tokenizers names any of them (R-16). A test holds this list to the vendored README. Every
- * implementation provides them, so the conformance runner fails a case that names one an implementation lacks rather
- * than skipping it (Reporting results).
+ * The IDs of the tokenizers conformance/README.md publishes, in its order, any under Optional included, whether or
+ * not this package provides them. A trace that names one always means its published count, so assemble() stops
+ * before assembly when the caller's options.tokenizers names any of them (R-16). A test holds this list to the
+ * vendored README.
  */
 export const PUBLISHED_TOKENIZERS: readonly string[] = ['fixture-whitespace/v1', 'estimate-utf8/v1'];
+
+/** The tokenizers every implementation provides: the README's bullets before Optional, today every published one.
+ * The conformance runner fails a case that names one an implementation lacks rather than skipping it (Reporting
+ * results). */
+export const REQUIRED_TOKENIZERS: readonly string[] = ['fixture-whitespace/v1', 'estimate-utf8/v1'];
 
 /**
  * The tokenizers this package provides. The table is frozen, not just typed read-only: a caller that assigned a key

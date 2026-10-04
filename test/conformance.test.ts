@@ -3,10 +3,7 @@ import assert from 'node:assert/strict';
 import { assemble, SnapshotRejectedError } from '../src/index.js';
 import { comparable } from '../src/conformance.js';
 import { validateTrace } from '../src/schemas.js';
-import { loadCases, loadRejections } from './cases.js';
-
-// Cases this implementation does not pass yet. The list only shrinks; it is empty when M13 is done.
-const PENDING = new Set<string>([]);
+import { loadCases, loadRejections, PENDING } from './cases.js';
 
 // The trace is compared as Running a case compares it: without trace_id, timings and recovery.detail.
 
@@ -22,7 +19,7 @@ for (const c of loadCases()) {
 }
 
 for (const r of loadRejections()) {
-  test(`rejection ${r.id}`, () => {
+  test(`rejection ${r.id}`, { todo: PENDING.has(r.id) }, () => {
     assert.throws(() => assemble(r.snapshot), SnapshotRejectedError);
   });
 }

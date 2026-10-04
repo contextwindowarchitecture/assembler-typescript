@@ -1,6 +1,7 @@
 // Renderers (conformance/README.md, Tokenizers and renderers). A renderer turns the placed items into payload
 // bytes and counts them with the snapshot's tokenizer; fitting renders the whole payload for every fit test.
 import { createHash } from 'node:crypto';
+import { parseInstant } from './instant.js';
 import { canonicalize, compareStrings } from './strings.js';
 import type { Tokenizer } from './tokenizers.js';
 import type { Profile, Slot } from './types.js';
@@ -32,9 +33,20 @@ export const realizationProblems = (renderer: string, placement: Placement): str
 
 /** The renderers this package provides, the only ones it renders with: it takes none of the application's own
  * (R-16). The list is frozen, so a caller cannot add an ID assemble() would accept and fail to render. A test holds
- * it to the renderers conformance/README.md publishes, which every implementation provides, so the conformance runner
- * also reads it as the required renderers (Reporting results). */
+ * it to the published renderers, every required one among them. */
 export const RENDERERS: readonly string[] = Object.freeze(Object.keys(REALIZE));
+
+/**
+ * The IDs of the renderers conformance/README.md publishes, in its order, those under Optional included, whether or
+ * not this package provides them. A trace that names one always means its published rendering (R-16). The package
+ * takes no renderer of the application's own, so none can take one of these IDs, and RENDERERS holds only IDs from
+ * this list. A test holds it to the vendored README.
+ */
+export const PUBLISHED_RENDERERS: readonly string[] = Object.freeze(['fixture-xml/v1', 'cwa-messages/v1', 'cwa-message-blocks/v1']);
+
+/** The renderers every implementation provides: the README's bullets before Optional. The conformance runner fails a
+ * case that names one an implementation lacks rather than skipping it (Reporting results). */
+export const REQUIRED_RENDERERS: readonly string[] = Object.freeze(['fixture-xml/v1', 'cwa-messages/v1']);
 
 /** An item as the renderer sees it: the body is its current one, a variant once fitting has compressed it. */
 export interface RenderItem {
@@ -42,6 +54,8 @@ export interface RenderItem {
   slot: Slot;
   body: string;
   lineage: string;
+  /** When the item was observed; for a history turn, when it was said (R-2, R-7). */
+  freshness: string;
   /** The id of the surfaced conflict group whose member this item is (R-11). */
   conflict?: string | undefined;
 }
@@ -92,11 +106,20 @@ interface Layout {
   occurrences: { item: RenderItem; placement: number; wrap: string }[];
 }
 
+/** A placement's items in every renderer's order (conformance/README.md, Ordering): by id, except that
+ * interaction.history renders its turns in the order they were said, by freshness compared as instants at full
+ * precision, and by id only among turns said at the same instant (R-7). */
+function ordered(slot: Slot, items: readonly RenderItem[]): RenderItem[] {
+  const inSlot = items.filter(item => item.slot === slot);
+  if (slot !== 'interaction.history') return inSlot.sort((a, b) => compareStrings(a.id, b.id));
+  const said = new Map(inSlot.map(item => [item, parseInstant(item.freshness)]));
+  return inSlot.sort((a, b) => said.get(a)!.compare(said.get(b)!) || compareStrings(a.id, b.id));
+}
+
 function layout(renderer: string, placement: Placement, items: readonly RenderItem[]): Layout {
-  const sorted = [...items].sort((a, b) => compareStrings(a.id, b.id));
   const occurrences: Layout['occurrences'] = [];
   placement.forEach(({ slot, wrap }, index) => {
-    for (const item of sorted) if (item.slot === slot) occurrences.push({ item, placement: index, wrap });
+    for (const item of ordered(slot, items)) occurrences.push({ item, placement: index, wrap });
   });
   if (renderer === 'fixture-xml/v1') {
     const text = occurrences.map(({ item, wrap }) => xmlElement(wrap.slice(4), item, false)).join('');

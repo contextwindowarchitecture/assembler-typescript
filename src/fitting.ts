@@ -39,8 +39,8 @@ export function fit(snapshot: Snapshot, items: AdmittedItem[], marks: Map<string
   const slotSize = (state: State, slot: Slot): number => [...state.values()]
     .filter(c => c.admitted.item.slot === slot)
     .reduce((sum, c) => sum + wraps(slot).reduce((n, wrap) => n + count(renderedBody(wrap, c.body)), 0), 0);
-  const renderItems = (state: State) => [...state.values()].map(c => ({
-    id: c.admitted.item.id, slot: c.admitted.item.slot, body: c.body, lineage: c.admitted.item.lineage, conflict: marks.get(c.admitted.item.id),
+  const renderItems = (state: State) => [...state.values()].map(({ admitted: { item }, body }) => ({
+    id: item.id, slot: item.slot, body, lineage: item.lineage, freshness: item.freshness, conflict: marks.get(item.id),
   }));
   const renderState = (state: State): Rendered => render(snapshot.renderer, placement, renderItems(state), count);
   // The charged count, n × (100 + margin) / 100 rounded up, must be at most budget.input. Each fit test counts

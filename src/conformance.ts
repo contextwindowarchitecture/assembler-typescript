@@ -6,10 +6,10 @@ import { assemble } from './assemble.js';
 import { SnapshotRejectedError, UnsupportedComponentError } from './errors.js';
 import { CONTRACT_SOURCE } from './generated/contract.js';
 import { IMPLEMENTATION } from './implementation.js';
-import { RENDERERS } from './renderers.js';
+import { RENDERERS, REQUIRED_RENDERERS } from './renderers.js';
 import { validateTrace } from './schemas.js';
 import { compareStrings } from './strings.js';
-import { PUBLISHED_TOKENIZERS, TOKENIZERS } from './tokenizers.js';
+import { REQUIRED_TOKENIZERS, TOKENIZERS } from './tokenizers.js';
 import type { ConformanceReport } from './types.js';
 
 type CaseRow = ConformanceReport['cases'][number];
@@ -28,9 +28,9 @@ export type Provided = Readonly<Record<Component, readonly string[]>>;
 /** What this package provides: the own keys of TOKENIZERS, and RENDERERS. */
 const PROVIDED: Provided = { tokenizer: Object.keys(TOKENIZERS), renderer: RENDERERS };
 
-/** What every implementation provides: the bullets under Tokenizers and renderers, today every published component.
- * A test holds PUBLISHED_TOKENIZERS and RENDERERS to those bullets. Any other ID is optional. */
-const REQUIRED: Provided = { tokenizer: PUBLISHED_TOKENIZERS, renderer: RENDERERS };
+/** What every implementation provides: the bullets under Tokenizers and renderers before Optional. A test holds
+ * REQUIRED_TOKENIZERS and REQUIRED_RENDERERS to those bullets. Any other ID is optional, listed under Optional or not. */
+const REQUIRED: Provided = { tokenizer: REQUIRED_TOKENIZERS, renderer: REQUIRED_RENDERERS };
 
 /**
  * The outcome Reporting results gives a run that needs a component the implementation does not provide, or

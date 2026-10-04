@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { componentOutcome, runConformance } from '../src/conformance.js';
 import { IMPLEMENTATION } from '../src/implementation.js';
 import { validateReport } from '../src/schemas.js';
-import { CONFORMANCE } from './cases.js';
+import { CONFORMANCE, PENDING } from './cases.js';
 import { ROOT } from './root.js';
 
 const lock = JSON.parse(readFileSync(join(ROOT, 'vendor', 'cwa.lock.json'), 'utf8')) as { website_commit: string; dirty: boolean };
@@ -17,10 +17,12 @@ test('the report passes every case and rejects every rejection snapshot, in the 
   assert.equal(validateReport(report), true, JSON.stringify(validateReport.errors));
   assert.deepEqual(report.implementation, { name: pkg.name, version: pkg.version, language: 'TypeScript' });
   assert.deepEqual(report.contract, { website_commit: lock.website_commit, dirty: lock.dirty });
-  assert.equal(report.cases.length, 58);
-  assert.deepEqual(report.cases.filter(c => c.outcome !== 'passed'), []);
-  assert.equal(report.rejections?.length, 24);
-  assert.deepEqual(report.rejections?.filter(r => r.outcome !== 'rejected'), []);
+  // A pending case or rejection snapshot may only be skipped: it uses an optional renderer this package lacks.
+  const pending = (row: { id: string; outcome: string }) => PENDING.has(row.id) && row.outcome === 'skipped';
+  assert.equal(report.cases.length, 61);
+  assert.deepEqual(report.cases.filter(c => c.outcome !== 'passed' && !pending(c)), []);
+  assert.equal(report.rejections?.length, 25);
+  assert.deepEqual(report.rejections?.filter(r => r.outcome !== 'rejected' && !pending(r)), []);
   const ids = report.cases.map(c => c.id);
   assert.deepEqual(ids, [...ids].sort());
   const fixture = report.cases.find(c => c.id === 'fixture-three-slot')!;
