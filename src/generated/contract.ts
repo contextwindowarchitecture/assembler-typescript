@@ -2,7 +2,7 @@
 
 /** The website commit the vendored contract came from (vendor/cwa.lock.json). */
 export const CONTRACT_SOURCE = {
-  "website_commit": "fc51bf8a1efa8e8c12d23623a8d28de29242b6de",
+  "website_commit": "9e24a299c6efec7982031e3f0e2f1bd6188d0d0c",
   "dirty": false
 } as const;
 
@@ -2226,13 +2226,13 @@ export const REASONS = [
     "code": "unknown_slot",
     "kind": "exclusion",
     "rule": "R-1",
-    "text": "The slot name is not one of the eleven. Check spelling and plane prefix."
+    "text": "The slot is not one of the eleven slot names, whatever its JSON type: a number, null, an array or an object is unknown_slot too, not invalid_structure, since this code comes first (R-21). Check spelling and plane prefix."
   },
   {
     "code": "unknown_authority",
     "kind": "exclusion",
     "rule": "R-1",
-    "text": "The authority value is not one of the seven roles. capability and steering are not authority values; use governing with a conflict_policy."
+    "text": "The authority is not one of the seven roles, whatever its JSON type: a number, null, an array or an object is unknown_authority too, not invalid_structure, since this code comes first (R-21). capability and steering are not authority values; use governing with a conflict_policy."
   },
   {
     "code": "invalid_structure",
