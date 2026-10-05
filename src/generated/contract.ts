@@ -2,7 +2,7 @@
 
 /** The website commit the vendored contract came from (vendor/cwa.lock.json). */
 export const CONTRACT_SOURCE = {
-  "website_commit": "9e24a299c6efec7982031e3f0e2f1bd6188d0d0c",
+  "website_commit": "79da314331b10dccdc1fc938f8e4cc5708d9cfba",
   "dirty": false
 } as const;
 
