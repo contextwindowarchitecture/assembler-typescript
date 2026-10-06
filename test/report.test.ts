@@ -9,15 +9,16 @@ import { validateReport } from '../src/schemas.js';
 import { CONFORMANCE, PENDING } from './cases.js';
 import { ROOT } from './root.js';
 
-const lock = JSON.parse(readFileSync(join(ROOT, 'vendor', 'cwa.lock.json'), 'utf8')) as { website_commit: string; dirty: boolean };
+const lock = JSON.parse(readFileSync(join(ROOT, 'vendor', 'cwa.lock.json'), 'utf8')) as { repository: string; spec_commit: string; dirty: boolean };
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as { name: string; version: string };
 
 test('the report passes every case and rejects every rejection snapshot, in the published format', () => {
   const report = runConformance(CONFORMANCE);
   assert.equal(validateReport(report), true, JSON.stringify(validateReport.errors));
   assert.deepEqual(report.implementation, { name: pkg.name, version: pkg.version, language: 'TypeScript' });
-  // The lock records no source repository yet, so the contract's cases come from the website repository.
-  assert.deepEqual(report.contract, { repository: 'contextwindowarchitecture/website', commit: lock.website_commit, dirty: lock.dirty });
+  // The contract member names the specification repository and commit the lock records.
+  assert.deepEqual(report.contract, { repository: lock.repository, commit: lock.spec_commit, dirty: lock.dirty });
+  assert.equal(report.contract.repository, 'contextwindowarchitecture/contextwindowarchitecture');
   // A pending case or rejection snapshot may only be skipped: it uses an optional renderer this package lacks.
   const pending = (row: { id: string; outcome: string }) => PENDING.has(row.id) && row.outcome === 'skipped';
   assert.equal(report.cases.length, 61);

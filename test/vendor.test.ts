@@ -6,7 +6,8 @@ import { join, relative, sep } from 'node:path';
 import { ROOT } from './root.js';
 
 interface Lock {
-  website_commit: string;
+  repository: string;
+  spec_commit: string;
   dirty: boolean;
   files: Record<string, string>;
 }
@@ -22,7 +23,8 @@ async function walk(dir: string): Promise<string[]> {
 
 test('the vendored contract matches its lock, file for file and hash for hash', async () => {
   const lock = JSON.parse(await readFile(join(ROOT, 'vendor', 'cwa.lock.json'), 'utf8')) as Lock;
-  assert.match(lock.website_commit, /^[0-9a-f]{40}$/);
+  assert.equal(lock.repository, 'contextwindowarchitecture/contextwindowarchitecture');
+  assert.match(lock.spec_commit, /^[0-9a-f]{40}$/);
   assert.equal(typeof lock.dirty, 'boolean');
   const onDisk = (await walk(VENDOR)).map(file => relative(VENDOR, file).split(sep).join('/')).sort();
   assert.deepEqual(onDisk, Object.keys(lock.files).sort());

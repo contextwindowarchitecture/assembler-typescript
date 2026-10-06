@@ -1,5 +1,6 @@
-// Copies the published CWA contract from a website checkout into vendor/cwa/ and pins every file by SHA-256
-// in vendor/cwa.lock.json, with the website commit it came from. Usage: pnpm run vendor <website checkout>
+// Copies the published CWA contract from a checkout of the specification repository into vendor/cwa/ and pins
+// every file by SHA-256 in vendor/cwa.lock.json, with the repository and commit it came from.
+// Usage: pnpm run vendor <specification checkout>
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -15,7 +16,7 @@ const SOURCES = ['LICENSE', 'NOTICE', 'schema', 'contract/requirements.json', 'c
 
 const web = process.argv[2];
 if (!web) {
-  console.error('usage: pnpm run vendor <website checkout>');
+  console.error('usage: pnpm run vendor <specification checkout>');
   process.exit(2);
 }
 const git = (...args) => execFileSync('git', ['-C', web, ...args], { encoding: 'utf8' }).trim();
@@ -36,6 +37,13 @@ for (const source of SOURCES) {
 const sorted = Object.fromEntries(Object.entries(files).sort(([a], [b]) => (a < b ? -1 : 1)));
 // Dirty means a tracked file differs from the commit. Untracked files (an editor's or a tool's directory
 // beside the contract) are not part of what the commit publishes, so they leave the flag alone.
-const lock = { website_commit: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain', '--untracked-files=no') !== '', files: sorted };
+// The repository is the owner/name the checkout's origin remote names on GitHub, ssh or https.
+const origin = git('remote', 'get-url', 'origin');
+const repository = origin.match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?\/?$/)?.[1];
+if (!repository) {
+  console.error(`the checkout's origin remote is not a GitHub repository: ${origin}`);
+  process.exit(1);
+}
+const lock = { repository, spec_commit: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain', '--untracked-files=no') !== '', files: sorted };
 writeFileSync(LOCK, JSON.stringify(lock, null, 2) + '\n');
-console.log(`vendored ${Object.keys(sorted).length} files from ${lock.website_commit}${lock.dirty ? ' (dirty)' : ''}`);
+console.log(`vendored ${Object.keys(sorted).length} files from ${repository} ${lock.spec_commit}${lock.dirty ? ' (dirty)' : ''}`);
