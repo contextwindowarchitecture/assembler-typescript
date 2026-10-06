@@ -312,10 +312,14 @@ export interface CWAConformanceReport {
     language?: string;
   };
   /**
-   * The website commit the cases were taken from, and whether that working tree had uncommitted changes.
+   * The repository and commit the cases were taken from, and whether that working tree had uncommitted changes.
    */
   contract: {
-    website_commit: string;
+    /**
+     * The repository as owner/name on GitHub.
+     */
+    repository: string;
+    commit: string;
     dirty: boolean;
   };
   /**

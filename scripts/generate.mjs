@@ -46,10 +46,12 @@ const types = await compile(wrapper, 'CwaContract', {
 const reasons = read('contract/reasons.json');
 const slotDefaults = read('contract/slot-defaults.json');
 const lock = JSON.parse(readFileSync(join(ROOT, 'vendor', 'cwa.lock.json'), 'utf8'));
+// The lock records no source repository yet; until it does, the contract comes from the website repository.
+const SOURCE_REPOSITORY = 'contextwindowarchitecture/website';
 const json = value => JSON.stringify(value, null, 2);
 const contract = `${BANNER}
-/** The website commit the vendored contract came from (vendor/cwa.lock.json). */
-export const CONTRACT_SOURCE = ${json({ website_commit: lock.website_commit, dirty: lock.dirty })} as const;
+/** The repository and commit the vendored contract came from, and whether that checkout was dirty (vendor/cwa.lock.json): the report's \`contract\` member. */
+export const CONTRACT_SOURCE = ${json({ repository: lock.repository ?? SOURCE_REPOSITORY, commit: lock.website_commit, dirty: lock.dirty })} as const;
 
 /** The published JSON Schemas, keyed by file name (vendor/cwa/schema/). */
 export const SCHEMAS: Readonly<Record<string, Record<string, unknown>>> = ${json(schemas)};

@@ -16,7 +16,8 @@ test('the report passes every case and rejects every rejection snapshot, in the 
   const report = runConformance(CONFORMANCE);
   assert.equal(validateReport(report), true, JSON.stringify(validateReport.errors));
   assert.deepEqual(report.implementation, { name: pkg.name, version: pkg.version, language: 'TypeScript' });
-  assert.deepEqual(report.contract, { website_commit: lock.website_commit, dirty: lock.dirty });
+  // The lock records no source repository yet, so the contract's cases come from the website repository.
+  assert.deepEqual(report.contract, { repository: 'contextwindowarchitecture/website', commit: lock.website_commit, dirty: lock.dirty });
   // A pending case or rejection snapshot may only be skipped: it uses an optional renderer this package lacks.
   const pending = (row: { id: string; outcome: string }) => PENDING.has(row.id) && row.outcome === 'skipped';
   assert.equal(report.cases.length, 61);
