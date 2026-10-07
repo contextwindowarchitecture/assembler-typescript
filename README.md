@@ -2,7 +2,7 @@
 
 A TypeScript assembler for the [Context Window Architecture](https://contextwindowarchitecture.io) (CWA) draft specification. It admits candidate items, resolves declared conflicts, fits them to a token budget, renders the payload and emits the trace.
 
-Status: in development (M13). It passes all 61 published conformance cases byte for byte and rejects all 25 rejection snapshots.
+Status: in development (M13). It passes all 62 published conformance cases byte for byte and rejects all 25 rejection snapshots.
 
 ## Install
 

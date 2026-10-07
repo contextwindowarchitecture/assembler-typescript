@@ -21,7 +21,7 @@ test('the report passes every case and rejects every rejection snapshot, in the 
   assert.equal(report.contract.repository, 'contextwindowarchitecture/contextwindowarchitecture');
   // A pending case or rejection snapshot may only be skipped: it uses an optional renderer this package lacks.
   const pending = (row: { id: string; outcome: string }) => PENDING.has(row.id) && row.outcome === 'skipped';
-  assert.equal(report.cases.length, 61);
+  assert.equal(report.cases.length, 62);
   assert.deepEqual(report.cases.filter(c => c.outcome !== 'passed' && !pending(c)), []);
   assert.equal(report.rejections?.length, 25);
   assert.deepEqual(report.rejections?.filter(r => r.outcome !== 'rejected' && !pending(r)), []);
