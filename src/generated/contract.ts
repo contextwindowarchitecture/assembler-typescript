@@ -3,7 +3,7 @@
 /** The repository and commit the vendored contract came from, and whether that checkout was dirty (vendor/cwa.lock.json): the report's `contract` member. */
 export const CONTRACT_SOURCE = {
   "repository": "contextwindowarchitecture/contextwindowarchitecture",
-  "commit": "359bdabf4b7b5657a59ea7801bf98b4192e9e4cf",
+  "commit": "c252494af79720d23c95d54c0cf9c638d3e43557",
   "dirty": false
 } as const;
 
