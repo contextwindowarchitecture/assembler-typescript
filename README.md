@@ -58,7 +58,7 @@ This runs every vendored case and rejection snapshot as `conformance/README.md` 
 
 ## Publishing
 
-`pnpm publish` publishes with public access (`publishConfig`). `prepublishOnly` runs the tests and a fresh build first, so a failing or stale `dist/` is never published. The tarball holds `dist/`, `LICENSE`, `NOTICE`, `README.md` and `package.json`.
+`pnpm publish` publishes with public access (`publishConfig`). `prepublishOnly` runs the tests and a fresh build first, so a failing or stale `dist/` is never published: `pnpm run build` empties `dist/` before compiling, and `pnpm test` builds before it tests. The tarball holds the modules the package's exports reach, as `.js` and `.d.ts` in `dist/`, with `LICENSE`, `NOTICE`, `README.md` and `package.json`. `.npmignore` keeps out everything else, the conformance CLI and source maps included, and `package.json` has no `files` list, since npm and pnpm ignore a root `.npmignore` when it does. A test packs the package and fails on any other file, or on a reached module that is missing.
 
 Each tag gets a GitHub release once CI passes on the tagged commit (`.github/workflows/release.yml`); it publishes nothing to npm. Its notes name the specification repository and commit `vendor/cwa.lock.json` pins and list the tag's own commits, written by git-cliff (`cliff.toml`). A tag that is not `vX.Y.Z` is a prerelease, and a tag pushed before the workflow existed is released with `gh workflow run release.yml -f tag=<tag>`.
 

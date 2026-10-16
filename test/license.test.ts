@@ -2,23 +2,46 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { ROOT } from './root.js';
 
 const read = (path: string): string => readFileSync(join(ROOT, path), 'utf8');
 
+const packedPaths = (): string[] =>
+  (JSON.parse(execFileSync('pnpm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: ROOT, encoding: 'utf8' })) as
+    { files: { path: string }[] }).files.map(file => file.path);
+
 test('the package is Apache-2.0, like the specification it implements', () => {
-  const pkg = JSON.parse(read('package.json')) as { license?: string; files?: string[] };
+  const pkg = JSON.parse(read('package.json')) as { license?: string };
   assert.equal(pkg.license, 'Apache-2.0');
   assert.equal(read('LICENSE'), read('vendor/cwa/LICENSE'));
   assert.match(read('NOTICE'), /Apache License, Version 2\.0/);
 });
 
 test('the packed package carries LICENSE and NOTICE', () => {
-  const pack = JSON.parse(execFileSync('pnpm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: ROOT, encoding: 'utf8' })) as
-    { files: { path: string }[] };
-  const paths = pack.files.map(file => file.path);
+  const paths = packedPaths();
   for (const path of ['LICENSE', 'NOTICE']) assert.ok(paths.includes(path), path);
+});
+
+test('the packed package holds only the modules its exports reach, and its documents', () => {
+  // .npmignore keeps everything else out: sources, tests, the vendored contract, the conformance CLI, which runs
+  // only against vendor/, and source maps, which point at src/. Each module the exports reach ships as .js and .d.ts.
+  const pkg = JSON.parse(read('package.json')) as { exports: Record<string, Record<string, string>> };
+  const modules = new Set<string>();
+  const queue = Object.values(pkg.exports).flatMap(entry => Object.values(entry)).map(path => path.replace(/^\.\//, ''));
+  for (let path; (path = queue.pop()) !== undefined;) {
+    const module = path.replace(/(\.d\.ts|\.js)$/, '');
+    if (modules.has(module)) continue;
+    modules.add(module);
+    for (const file of [`${module}.js`, `${module}.d.ts`]) {
+      for (const [, specifier] of read(file).matchAll(/(?:from|import)\s*\(?\s*['"](\.\.?\/[^'"]+)['"]/g)) {
+        queue.push(posix.join(posix.dirname(file), specifier!));
+      }
+    }
+  }
+  const expected = [...modules].flatMap(module => [`${module}.js`, `${module}.d.ts`]);
+  expected.push('LICENSE', 'NOTICE', 'README.md', 'package.json');
+  assert.deepEqual(packedPaths().sort(), expected.sort());
 });
 
 test('the package is installed and run with pnpm, from its lockfile', () => {
