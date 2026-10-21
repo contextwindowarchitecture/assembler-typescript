@@ -3,8 +3,11 @@
 // is missing (R-12).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { assemble } from '../src/index.js';
 import { buildSnapshot, DOCS, main, toAnthropic, toOpenAI, type MessageRequest } from '../examples/quickstart.js';
+import { ROOT } from './root.js';
 
 const request = (): MessageRequest =>
   JSON.parse(new TextDecoder().decode(assemble(buildSnapshot(DOCS)).payload!)) as MessageRequest;
@@ -44,4 +47,12 @@ test('the quickstart runs', () => {
   const out = lines.join('\n');
   assert.match(out, /kb:pricing {2}below_threshold/);
   assert.match(out, /refused: evidence_required/);
+});
+
+test('the README shows what the quickstart prints', () => {
+  const lines: string[] = [];
+  main(line => lines.push(line));
+  const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
+  const shown = /pnpm run quickstart\n```\n\n```text\n([\s\S]*?)```/.exec(readme);
+  assert.equal(shown?.[1], `${lines.join('\n')}\n`);
 });

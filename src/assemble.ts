@@ -18,6 +18,8 @@ export interface AssembleOptions {
   /**
    * Tokenizers to provide beside the published ones, keyed by the ID a snapshot names. No key may be the ID of a
    * published tokenizer, even one the snapshot does not name: assemble() throws PublishedTokenizerIdError (R-16).
+   * A tokenizer is found only as an own key, of TOKENIZERS or of this table, so an ID such as toString or __proto__
+   * is provided only when you pass it as a key of your own.
    */
   tokenizers?: Readonly<Record<string, Tokenizer>>;
   // No renderers option: the package takes no renderer of the application's own, so R-16's rule against one under a
@@ -28,6 +30,9 @@ export interface AssembleOptions {
 export interface Assembly {
   /** The rendered payload's UTF-8 bytes, or null when the assembly is refused (R-17). */
   payload: Uint8Array | null;
+  /** Valid against schema/trace.schema.json. timings holds each stage's duration in milliseconds. trace_id and
+   * timings may differ between runs of the same snapshot (R-23); everything else, the payload included, is
+   * deterministic. */
   trace: Trace;
 }
 

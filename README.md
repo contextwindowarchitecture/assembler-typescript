@@ -1,69 +1,240 @@
 # @contextwindowarchitecture/assembler
 
-A TypeScript assembler for the [Context Window Architecture](https://contextwindowarchitecture.io) (CWA) draft specification. It admits candidate items, resolves declared conflicts, fits them to a token budget, renders the payload and emits the trace.
+[![CI](https://github.com/contextwindowarchitecture/assembler-typescript/actions/workflows/ci.yml/badge.svg)](https://github.com/contextwindowarchitecture/assembler-typescript/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@contextwindowarchitecture/assembler)](https://www.npmjs.com/package/@contextwindowarchitecture/assembler)
+[![Node 22+](https://img.shields.io/badge/node-%3E%3D22-blue)](package.json)
+[![Spec: CWA draft](https://img.shields.io/badge/spec-CWA%20draft-orange)](https://contextwindowarchitecture.io/spec.html)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
-Status: in development (M13). It passes all 65 published conformance cases byte for byte and rejects all 25 rejection snapshots.
+Decide what your model sees, and keep a record of why.
+
+This is the TypeScript assembler for the [Context Window Architecture](https://contextwindowarchitecture.io) (CWA) specification. You give it everything that *could* go into a model request. It gives back the exact request to send and a trace of every decision. When the request would break your policy, it gives back a refusal instead, before any model is called.
+
+## What is the assembler
+
+Most applications build a prompt by gluing strings together: a system prompt, some retrieved chunks, the chat history and the question. That works until something goes wrong. Then nobody can say which chunks were sent, which were dropped to fit the context window, or why a retrieved web page ended up next to the system prompt.
+
+CWA treats the request as compiled output instead:
+
+1. **Producers** (your retriever, memory store, account service, chat history) propose typed **items** for named **slots**.
+2. **Your application** freezes those items, a versioned **route policy** and a **budget** into an immutable **snapshot**.
+3. **The assembler** turns the snapshot into a **payload**, the exact bytes to send, and a **trace** that says what went in, what was left out and why. When the snapshot can't produce a request that meets the policy, the assembler returns a **refusal** with the trace instead.
+
+```mermaid
+flowchart LR
+    P["Producers<br/>retriever, memory, state, chat"] --> A["Your application<br/>authenticates and freezes"]
+    A --> S["Snapshot<br/>items + policy + budget + clock"]
+    S --> X["assemble()"]
+    X -->|payload| M["Your model client"]
+    X -->|trace| T["What was sent, what was left out, and why"]
+    X -->|refusal| R["No model call"]
+```
+
+The payload depends on nothing but the snapshot, so the same snapshot always yields the same bytes. You can store a snapshot and replay it later to debug an answer, review a policy change, or audit what a model was shown.
+
+The package **is not** a retriever, an LLM client, an agent framework or a prompt template library. It sits between the code that gathers context and the code that calls the model, and works with whatever you already use on either side.
+
+## Status
+
+The package is a draft that tracks the CWA draft specification (`cwa/draft`), so the API and snapshot format can change before v1. The committed [conformance report](conformance-report.json) records the result for each published case. Prerelease versions are published to npm.
 
 ## Install
 
 ```sh
 pnpm add @contextwindowarchitecture/assembler
+# or
+npm install @contextwindowarchitecture/assembler
 ```
 
-## Use
+It requires Node.js 22 or newer, and ships as ESM only, with `.d.ts` types. Its only dependencies are `ajv` and `ajv-formats`.
+
+## Quickstart
+
+A support bot gets a question. The retriever found two chunks, and only one of them is relevant.
 
 ```ts
-import { assemble, SnapshotRejectedError } from '@contextwindowarchitecture/assembler';
+import { assemble, type Snapshot } from '@contextwindowarchitecture/assembler';
 
+const snapshot: Snapshot = {
+  assembly_time: '2026-10-21T12:00:00Z',          // the clock, frozen like everything else
+  scope: { tenant: 'acme', user: 'u_42', session: 's_1', task: 'support' },
+  budget: { input: 8000, reserved_output: 1024, margin_percent: 10 },
+  profile: PROFILE,             // where each slot lands in the request
+  route_policy: ROUTE_POLICY,   // which producer may write which slot, and each slot's rules
+  tokenizer: 'estimate-utf8/v1',
+  renderer: 'cwa-messages/v1',
+  batches: BATCHES,             // what each producer proposed: instructions, two chunks, the question
+  conflicts: [],
+};
 const { payload, trace } = assemble(snapshot);
-// payload: the rendered UTF-8 bytes, or null when the assembly is refused (trace.refused.reason says why)
+
+if (payload === null) {
+  console.log('refused:', trace.refused.reason);
+} else {
+  const request = JSON.parse(new TextDecoder().decode(payload));   // { system: [...], tools: [...], messages: [...] }
+}
+
+for (const row of trace.excluded) console.log(row.item_id, row.reason);   // kb:pricing below_threshold
 ```
 
-`assemble(snapshot, options?)` takes a snapshot in the shape of `schema/snapshot.schema.json`: the frozen assembly input (R-23). It runs admission, conflict resolution, supersession, deduplication, the source diversity cap, the refusal checks and fitting, as `conformance/README.md` defines them. It returns the payload and a trace valid against `schema/trace.schema.json`.
+[examples/quickstart.ts](examples/quickstart.ts) is the complete, runnable version, with the policy, the profile and the items written out. From a checkout:
 
-- A snapshot that fails its schemas or the snapshot checks throws `SnapshotRejectedError`, with its `problems` in words. There is no payload and no trace (R-17). `checkSnapshot(snapshot)` returns the same problems without assembling.
-- A snapshot that names a tokenizer or renderer this package does not provide throws `UnsupportedComponentError`. The package provides the tokenizers `fixture-whitespace/v1` and `estimate-utf8/v1` and the renderers `fixture-xml/v1` and `cwa-messages/v1`, every one `conformance/README.md` requires, and the optional renderer `cwa-message-blocks/v1`. That renderer writes the request `cwa-messages/v1` writes, except that the user message's content is one `{id, text}` entry per item placed with an `xml:` wrap, so an application can put a prompt cache breakpoint at any item boundary. It counts each entry on its own, so with a tokenizer such as `estimate-utf8/v1`, which rounds each text up, the same items can count more than under `cwa-messages/v1` and fewer of them fit. Pass your model's tokenizer as `options.tokenizers`, keyed by the ID your snapshots name. A tokenizer or renderer is found only as an own key, of the package's tables or of `options.tokenizers`, so an ID such as `toString` or `__proto__` is not provided unless you pass it as a key of your own. Route producers are looked up the same way: a batch's producer is listed only when it is an own key of `route_policy.producers`.
-- That ID must be one no published tokenizer uses, so that a trace naming a published tokenizer always means its published count (R-16). When `options.tokenizers` names a tokenizer `conformance/README.md` publishes, today `fixture-whitespace/v1` or `estimate-utf8/v1`, `assemble()` throws `PublishedTokenizerIdError` with those IDs in `ids`, even when the snapshot names another tokenizer. It stops before assembly, and before it checks the snapshot: there is no payload and no trace. R-16 says the same of a renderer under a published ID, today `fixture-xml/v1`, `cwa-messages/v1` or the optional `cwa-message-blocks/v1`, and here it holds with nothing to check: the package takes no renderer of the application's own. `AssembleOptions` has no renderers, and a snapshot's `renderer` must name `fixture-xml/v1`, `cwa-messages/v1` or `cwa-message-blocks/v1`, so a trace naming a published renderer always means its published rendering. The exported tables are frozen: assigning into `TOKENIZERS` throws a `TypeError` rather than replacing a published tokenizer, and so does changing `RENDERERS`.
-- `options.traceId` sets the trace id, which is otherwise a random UUID. `trace.timings` records each stage's duration in milliseconds. Both may differ between runs of the same snapshot (R-23); everything else, the payload bytes included, is deterministic.
+```sh
+pnpm run quickstart
+```
 
-## Requirements
+```text
+{
+  "system": "Answer from the evidence only, and say so when it does not cover the question.",
+  "messages": [
+    {
+      "content": "<evidence id=\"kb:refunds\">\nPro plans can be refunded in full within 30 days of purchase.\n</evidence>\n<query id=\"turn:1\">\nCan I get a refund on my Pro plan?\n</query>\n",
+      "role": "user"
+    }
+  ]
+}
 
-Node.js 22 or newer. The package is ESM only and compiled with `tsc` to JavaScript and `.d.ts` files in `dist/`.
+62 tokens; left out:
+  kb:pricing  below_threshold
 
-## Development
+refused: evidence_required, recovery: request_context
+```
+
+The low-scoring chunk was left out, and the trace says why. When the retriever finds nothing, the route requires evidence, so the assembler refuses before any model is called. The trace then suggests what to do next.
+
+A snapshot that is malformed, or breaks a rule the spec checks up front, throws `SnapshotRejectedError` with a list of `problems`. It produces no payload and no trace. `checkSnapshot(snapshot)` returns the same problems without assembling. A snapshot that names a tokenizer or renderer this package doesn't provide throws `UnsupportedComponentError` instead, because that isn't a flaw in the snapshot.
+
+## Core concepts
+
+| Term | What it is |
+| --- | --- |
+| **Item** | One piece of candidate context, such as an instruction, a retrieved chunk, a memory, a tool result or a chat turn. It carries its source, version, freshness, authority and trust alongside its body. |
+| **Slot** | Where an item belongs: `governance.instructions`, `evidence.knowledge`, `interaction.history` and so on. Each slot has defaults for authority, protection and trust. |
+| **Producer** | The component that proposes items, such as a retriever, a memory store or a state service. The route policy limits which slots it may write. |
+| **Route policy** | Versioned rules for one route: which producers it accepts, relevance thresholds, caps, what to do about conflicts, and whether evidence is required. |
+| **Placement profile** | Versioned layout: where each slot renders in the request (system, tools, or a tagged block in the user message). |
+| **Snapshot** | Everything assembly may look at, frozen. Its digest (`snapshotDigest(snapshot)`) is the replay key. |
+| **Payload** | The exact bytes to send, written by a renderer. |
+| **Trace** | Every item included, compressed or excluded, each exclusion with a registered reason code, plus any conflicts and the token count. |
+| **Refusal** | No payload, a trace saying why, and, where one applies, a suggested recovery. |
+
+The package exports TypeScript types for all of these (`Snapshot`, `Trace` and the rest), generated from the published JSON Schemas. The [specification](https://contextwindowarchitecture.io/spec.html) defines each one precisely.
+
+## Sending the payload to a model
+
+The `cwa-messages/v1` renderer writes a provider-neutral request as JSON:
+
+```json
+{"system": [{"id": "...", "text": "..."}], "tools": [{"id": "...", "text": "..."}], "messages": [{"role": "user", "content": "..."}]}
+```
+
+Only governance items reach `system` and `tools`. Everything else, prior turns included, is escaped into a single user message. Mapping that onto a provider's SDK takes a few lines. [examples/quickstart.ts](examples/quickstart.ts) has both mappings:
+
+```ts
+const request = JSON.parse(new TextDecoder().decode(payload));
+
+// a separate system prompt, as in the Anthropic Messages API
+await client.messages.create({ model, max_tokens, ...toAnthropic(request) });
+
+// a system message, as in OpenAI Chat Completions and compatible servers
+await client.chat.completions.create({ model, ...toOpenAI(request) });
+```
+
+If you use prompt caching, the `cwa-message-blocks/v1` renderer writes the same request, with the user message split into one `{id, text}` block per item, so you can place a cache breakpoint at any item boundary. It counts each block on its own. With a tokenizer that rounds each text up, such as `estimate-utf8/v1`, the same items can count more than under `cwa-messages/v1`, so fewer of them fit.
+
+## Framework-agnostic and compatibility
+
+- **No framework or SDK lock-in.** The input is a plain JSON object and the output is bytes. Producers can be built on LlamaIndex, LangChain, a SQL query or a vector store. The payload goes to whichever client you already use.
+- **Small and typed.** It has two runtime dependencies, makes no network or filesystem calls inside `assemble()`, and never calls a model. Its types come straight from the published schemas.
+- **Node.js 22 and newer.** CI tests Node 22 and 24.
+- **Byte-identical across languages.** The [Python](https://github.com/contextwindowarchitecture/assembler-python), [Go](https://github.com/contextwindowarchitecture/assembler-go) and [Rust](https://github.com/contextwindowarchitecture/assembler-rust) assemblers pass the same conformance cases. A snapshot frozen in one service can be assembled, or replayed, in another.
+- **Cost scales with what you send.** Every reduction under budget pressure renders and counts the whole payload again. Keep the cost down at the source: send no more passages than the route's budget can use, and bound slots with `max_per_source` or `max_tokens`.
+- **Built-in components.** Each one is named by id in the snapshot:
+
+| Kind | Id | Use it for |
+| --- | --- | --- |
+| Tokenizer | `estimate-utf8/v1` | A portable estimate (UTF-8 bytes ÷ 4, rounded up) for models without a local tokenizer; pair it with `budget.margin_percent` |
+| Tokenizer | `fixture-whitespace/v1` | Conformance tests only |
+| Renderer | `cwa-messages/v1` | Chat-style model APIs |
+| Renderer | `cwa-message-blocks/v1` | The same request with per-item blocks for prompt caching (optional in the spec) |
+| Renderer | `fixture-xml/v1` | Conformance tests: one plain-text block, with no system channel |
+
+For exact counts, pass your model's own tokenizer (see [Extending](#extending)).
+
+## Security model
+
+The assembler enforces the structural rules the spec gives it. It cannot see everything, so the "does not do" half of this section matters as much as the first.
+
+**What the assembler enforces:**
+
+- **Nothing outside the snapshot reaches the payload.** `assemble()` reads no network, files, environment or model. Only the trace's `trace_id` (random unless you set `traceId`) and `timings` vary between runs.
+- **Validation at the boundary.** A snapshot that fails its schemas or the spec's checks is rejected whole, and no payload is produced.
+- **Producers stay in their lane.** The route policy lists which producer may write which slot, and a producer's kind narrows that further. For example, a retriever can only add evidence.
+- **Authority comes from the slot, not the wording.** Only governance items render into the system and tools channels. Retrieved text, tool output, memory and user turns are escaped into the user message, so a chunk containing `</evidence><system>…` stays inert text. Untrusted authority is accepted only in tool results, memory and history.
+- **Tools come from an allow-list.** A tool is offered only when the capability grant's producer, listed by the route, proposes it, and it is on the grant's allow-list.
+- **Refusal before the model call.** A missing required slot, protected content that won't fit, an unresolved conflict or missing evidence produces a refusal, not a degraded prompt.
+
+**What it does not do:**
+
+- **It doesn't authenticate producers.** Your application binds an identity to each batch. The assembler trusts that binding and checks only that the route lists the producer.
+- **It doesn't detect or neutralize prompt injection.** Marking and separating untrusted content limits where that content can appear. It does not stop a model from following instructions written inside it.
+- **It doesn't sanitize content or redact personal data.** Scope checks compare declared scope fields; they don't inspect bodies.
+- **It doesn't check tool calls.** It decides which tools are offered. Checking each call before it runs is the application's job ([examples/04-tools](https://github.com/contextwindowarchitecture/examples/tree/main/04-tools) shows a guard).
+- **It doesn't pin profiles or policies.** This package has no registry lock. Check digests yourself before freezing, or use the [Python assembler's](https://github.com/contextwindowarchitecture/assembler-python) registry.
+
+## Extending
+
+**Your own tokenizer.** A tokenizer is a function from text to a token count. Pass it in `options.tokenizers`, keyed by the id your snapshots name. That id can't be one the spec publishes (today `fixture-whitespace/v1` and `estimate-utf8/v1`), because a trace naming a published tokenizer must mean that tokenizer's count. Using one throws `PublishedTokenizerIdError` before anything else runs.
+
+```ts
+const chars = (text: string) => text.length;
+assemble(snapshot, { tokenizers: { 'my-chars/v1': chars } });   // snapshot.tokenizer === 'my-chars/v1'
+```
+
+Load any data it needs, such as an encoding file or a vocabulary, before you call `assemble()`. If it estimates, reserve headroom with `budget.margin_percent`.
+
+**Renderers are fixed.** The package renders only with its built-in renderers, listed in `RENDERERS`, and takes none of your own. Map `cwa-messages/v1` or `cwa-message-blocks/v1` onto your provider instead. The `TOKENIZERS` and `RENDERERS` tables are frozen.
+
+**Trace ids.** `options.traceId` sets the trace's id, which is otherwise a random UUID.
+
+## Examples
+
+| Where | What |
+| --- | --- |
+| [examples/quickstart.ts](examples/quickstart.ts) | One request assembled, one refused, and the payload mapped onto provider SDKs |
+| [contextwindowarchitecture/assembler-demo](https://github.com/contextwindowarchitecture/assembler-demo) | An inspector that runs the same question through all four assemblers, this one included, and shows every decision |
+| [contextwindowarchitecture/examples](https://github.com/contextwindowarchitecture/examples) | Five runnable apps, from a help-center Q&A bot to a production-shaped agent. They're written in Python, but the snapshots they build assemble the same way here |
+| [contextwindowarchitecture/integrations](https://github.com/contextwindowarchitecture/integrations) | CWA placed inside existing systems |
+
+## Documentation
+
+| Read | For |
+| --- | --- |
+| [The specification](https://contextwindowarchitecture.io/spec.html) | What CWA requires, requirement by requirement |
+| [Producer guide](https://github.com/contextwindowarchitecture/contextwindowarchitecture/blob/main/guides/producers.md) | How to write the items you put in a snapshot |
+| [Assembler guide](https://github.com/contextwindowarchitecture/contextwindowarchitecture/blob/main/guides/assemblers.md) | How an assembler behaves, renderer by renderer |
+| [conformance-report.json](conformance-report.json) | The result for each conformance case |
+
+The TSDoc of `assemble`, `AssembleOptions` and the error classes gives the exact rules for what is thrown and when.
+
+## Developing
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm run build
 pnpm test
 ```
 
-pnpm is the package manager. `packageManager` in `package.json` pins its version, which pnpm switches to by itself, and `pnpm-lock.yaml` pins every dependency. CI (`.github/workflows/ci.yml`) runs `pnpm install --frozen-lockfile` and `pnpm test` on Node 22 and 24.
+Changes are made test-first, from the published spec only. The contract is vendored from the specification repository and never edited here. [CONTRIBUTING.md](CONTRIBUTING.md) covers the workflow, conformance, publishing and releases, and [AGENTS.md](AGENTS.md) holds the full rules.
 
-## Cost
+## Other implementations
 
-Every reduction under budget pressure is its own fit test, and every fit test renders and counts the whole payload (conformance/README.md, Fitting). A fit test counts only the payload; per-item counts are made once, for the trace. Shedding 498 of 500 passages of about 180 tokens each takes about a third of a second, nearly all of it tokenizing. Keep the cost down at the source, as the spec advises: send no more passages than the route's budget can use, and bound slots with `max_per_source` or `max_tokens`.
-
-## Conformance
-
-```sh
-pnpm run conformance
-```
-
-This runs every vendored case and rejection snapshot as `conformance/README.md` describes. It writes `conformance-report.json`, valid against `schema/conformance_report.schema.json`, and exits 1 unless every case passed and every rejection snapshot was rejected. A case passes only when its payload matches byte for byte and its trace matches field for field, except `trace_id`, `timings` and `recovery.detail`, which is free text for people. The report's `contract` member names the repository and commit the cases came from, and whether that checkout was dirty, taken from `vendor/cwa.lock.json`: the specification repository, `contextwindowarchitecture/contextwindowarchitecture`. The committed report is the current run: a test fails when it goes stale. `runConformance(dir)` in `src/conformance.ts` does the same from code. Every implementation provides the four tokenizers and renderers `conformance/README.md` requires, the ones it lists before Optional, and this package does. It also provides the optional `cwa-message-blocks/v1`, so it skips no published case. A case is skipped only when its snapshot names an optional tokenizer or renderer, one the README does not require, that this package does not provide; a case that uses only required ones is never skipped, and an implementation that lacks one fails it. A rejection snapshot is skipped only when it names an optional renderer this package lacks and the check it breaks is that renderer's. Every other check runs before a renderer is needed and no check needs a tokenizer, so such a snapshot is rejected whatever it names, and one that breaks no check fails even when its tokenizer is missing. `componentOutcome()` makes the decision, and a test runs it against an implementation made to lack a required component, which no published case can reach.
-
-## The contract
-
-`vendor/cwa/` holds the published contract this implementation follows: the schemas, the contract data and the conformance cases, copied from the specification repository, [contextwindowarchitecture/contextwindowarchitecture](https://github.com/contextwindowarchitecture/contextwindowarchitecture), the contract's source (`pnpm run vendor <specification checkout>`). `vendor/cwa.lock.json` pins each file by SHA-256 and records the repository and the spec commit. It is Apache-2.0 licensed; see `vendor/cwa/LICENSE` and `vendor/cwa/NOTICE`.
-
-## Publishing
-
-`pnpm publish` publishes with public access (`publishConfig`). `prepublishOnly` runs the tests and a fresh build first, so a failing or stale `dist/` is never published: `pnpm run build` empties `dist/` before compiling, and `pnpm test` builds before it tests. The tarball holds the modules the package's exports reach, as `.js` and `.d.ts` in `dist/`, with `LICENSE`, `NOTICE`, `README.md` and `package.json`. `.npmignore` keeps out everything else, the conformance CLI and source maps included, and `package.json` has no `files` list, since npm and pnpm ignore a root `.npmignore` when it does. A test packs the package and fails on any other file, or on a reached module that is missing.
-
-Each tag gets a GitHub release once CI passes on the tagged commit (`.github/workflows/release.yml`); it publishes nothing to npm. Its notes name the specification repository and commit `vendor/cwa.lock.json` pins and list the tag's own commits, written by git-cliff (`cliff.toml`). A tag that is not `vX.Y.Z` is a prerelease, and a tag pushed before the workflow existed is released with `gh workflow run release.yml -f tag=<tag>`.
-
-See [AGENTS.md](AGENTS.md) for the working rules.
+| Language | Repository |
+| --- | --- |
+| Python (reference) | [assembler-python](https://github.com/contextwindowarchitecture/assembler-python) |
+| Go | [assembler-go](https://github.com/contextwindowarchitecture/assembler-go) |
+| Rust | [assembler-rust](https://github.com/contextwindowarchitecture/assembler-rust) |
+| A new language | [assembler-template](https://github.com/contextwindowarchitecture/assembler-template) |
 
 ## License
 
-Apache License 2.0, the same as the specification: see [LICENSE](LICENSE) and [NOTICE](NOTICE). The package embeds the published schemas and contract data, and `vendor/cwa/` holds the conformance cases, all from the Apache-2.0 specification.
+Apache License 2.0, the same as the specification. See [LICENSE](LICENSE) and [NOTICE](NOTICE). The package embeds the published schemas and contract data, and `vendor/cwa/` holds the conformance cases, all from the Apache-2.0 specification.
