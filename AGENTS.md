@@ -8,7 +8,11 @@ A TypeScript implementation of the CWA draft specification (M13 of the CWA plan)
 - **Commit unasked at each green step.** Don't wait to be asked to commit.
 - **Conventional Commits, signed off.** Use `git commit -s` with a Conventional Commits subject (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`, `build:`).
 - **Never push.**
-- **Docs change in the same commit as the behavior.** A commit that changes behavior also updates the README, this file, or the code comments that describe it.
+- **Docs change in the same commit as the behavior.** A commit that changes behavior also updates the TSDoc of the API it changes, the code comments that describe it, the README section a caller would read, and this file or CONTRIBUTING.md when a rule changes.
+- **The README is for application developers, not a log of work done.** Keep its sections, in this order: What is the assembler, Status, Install, Quickstart, Core concepts, Sending the payload to a model, Framework-agnostic and compatibility, Security model, Extending, Examples, Documentation, Developing, Other implementations, License.
+  - Status is three sentences at most and quotes no counts of cases, rejections or requirements. It links `conformance-report.json`, which holds them and cannot go stale.
+  - A change a caller can see gets a sentence or two in the section it affects. The exact rule (what throws what, and when) goes in the TSDoc of the API it belongs to. Never append clauses to Status.
+  - Code in the README must run. Quickstart mirrors `examples/quickstart.ts`, which `test/examples.test.ts` runs.
 - **Prove a test protects something.** Before claiming it does, break the code on purpose and watch the test fail.
 
 ## Working from the spec
