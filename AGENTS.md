@@ -7,6 +7,7 @@ A TypeScript implementation of the CWA draft specification (M13 of the CWA plan)
 - **Test-first.** Red, then green, then refactor. Write the failing test, watch it fail for the reason you expect, then make it pass.
 - **Commit unasked at each green step.** Don't wait to be asked to commit.
 - **Conventional Commits, signed off.** Use `git commit -s` with a Conventional Commits subject (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`, `build:`).
+- **The release workflow writes the changelog.** Never create or edit a changelog file, `CHANGELOG.md` included, and never run git-cliff to write one. `.github/workflows/release.yml` writes each tag's release notes from the commit history with git-cliff (`cliff.toml`), so a commit's subject line is its changelog entry.
 - **Never push.**
 - **Docs change in the same commit as the behavior.** A commit that changes behavior also updates the TSDoc of the API it changes, the code comments that describe it, the README section a caller would read, and this file or CONTRIBUTING.md when a rule changes.
 - **The README is for application developers, not a log of work done.** Keep its sections, in this order: What is the assembler, Status, Install, Quickstart, Core concepts, Sending the payload to a model, Framework-agnostic and compatibility, Security model, Extending, Examples, Documentation, Developing, Other implementations, License.

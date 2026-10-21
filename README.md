@@ -180,7 +180,7 @@ The assembler enforces the structural rules the spec gives it. It cannot see eve
 - **It doesn't detect or neutralize prompt injection.** Marking and separating untrusted content limits where that content can appear. It does not stop a model from following instructions written inside it.
 - **It doesn't sanitize content or redact personal data.** Scope checks compare declared scope fields; they don't inspect bodies.
 - **It doesn't check tool calls.** It decides which tools are offered. Checking each call before it runs is the application's job ([examples/04-tools](https://github.com/contextwindowarchitecture/examples/tree/main/04-tools) shows a guard).
-- **It doesn't pin profiles or policies.** This package has no registry lock. Check digests yourself before freezing, or use the [Python assembler's](https://github.com/contextwindowarchitecture/assembler-python) registry.
+- **It doesn't pin profiles or policies.** This package has no registry lock. Check digests yourself before freezing.
 
 ## Extending
 

@@ -27,6 +27,7 @@ pnpm run quickstart     # run examples/quickstart.ts
 
 - One step per commit, and every commit passes `pnpm test`. When you pipe its output, run `set -o pipefail` first, or a failing run looks green.
 - Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) (`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `refactor:`, `build:`), and sign off every commit (`git commit -s`).
+- Never create or edit a changelog file. The release workflow ([.github/workflows/release.yml](.github/workflows/release.yml)) writes each tag's release notes from the commit subjects with [git-cliff](https://git-cliff.org) (`cliff.toml`), so a commit's subject line is its changelog entry.
 
 ## Conformance
 
