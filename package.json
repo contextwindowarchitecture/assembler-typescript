@@ -25,6 +25,7 @@
     "vendor": "node scripts/vendor-contract.mjs",
     "generate": "node scripts/generate.mjs",
     "conformance": "pnpm run build && node dist/cli/conformance.js vendor/cwa/conformance conformance-report.json",
+    "quickstart": "pnpm run build && pnpm run build:test && node build/examples/quickstart.js",
     "prepublishOnly": "pnpm test && pnpm run build"
   },
   "devDependencies": {

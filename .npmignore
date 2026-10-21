@@ -32,3 +32,6 @@
 /pnpm-lock.yaml
 /node_modules/
 *.tgz
+
+# Examples run from a checkout, through the tests
+/examples/
